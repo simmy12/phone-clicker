@@ -1,17 +1,7 @@
 [
-  {
-    "text": "What is 2 plus 3?",
-    "options": ["4", "5", "6", "7"],
-    "correct": 2
-  },
-  {
-    "text": "Which color is the sky on a clear day?",
-    "options": ["Green", "Red", "Blue"],
-    "correct": 3
-  },
-  {
-    "text": "How many days are in a week?",
-    "options": ["5", "7", "10", "12"],
-    "correct": 2
-  }
+  { "text": "כמה ימים יש בשבוע?", "options": ["5", "6", "7", "8"], "correct": 3 },
+  { "text": "מהי העיר הגדולה ביותר במדינת אילינוי?", "options": ["ספרינגפילד", "שיקגו", "ניו יורק"], "correct": 2 },
+  { "text": "כמה נרות מדליקים בלילה האחרון של חנוכה (בלי השמש)?", "options": ["6", "7", "8", "9"], "correct": 3 },
+  { "text": "איזה צבע מתקבל מערבוב כחול וצהוב?", "options": ["ירוק", "סגול", "כתום", "חום"], "correct": 1 },
+  { "text": "כמה רגליים יש לעכביש?", "options": ["6", "8", "10"], "correct": 2 }
 ]

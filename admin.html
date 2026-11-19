@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ניהול - טריוויה בקליקרים</title>
+<style>
+  body { margin:0; font-family:"Segoe UI",Arial,sans-serif; background:#f4f2fb; color:#1f1b3a; }
+  .wrap { max-width:720px; margin:40px auto; padding:0 20px; }
+  .card { background:#fff; border-radius:16px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.06); margin-bottom:20px; }
+  h1 { margin:0 0 20px; } h2 { margin:0 0 14px; font-size:22px; }
+  label { display:block; margin:12px 0 4px; font-weight:600; }
+  input { font:inherit; font-size:17px; padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box; }
+  button { font:inherit; font-size:18px; font-weight:700; padding:12px 24px; border:0; border-radius:10px; background:#7c3aed; color:#fff; cursor:pointer; margin-top:16px; }
+  .link { margin-top:16px; padding:12px; background:#f0ecff; border-radius:8px; word-break:break-all; direction:ltr; font-size:14px; }
+  .err { color:#b91c1c; margin-top:10px; }
+  table { width:100%; border-collapse:collapse; } td,th { padding:8px; border-bottom:1px solid #eee; text-align:right; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ניהול משחקים</h1>
+  <div class="card">
+    <label>סיסמת ניהול</label>
+    <input id="key" type="password">
+  </div>
+  <div class="card">
+    <h2>יצירת משחק חדש ללקוח</h2>
+    <label>שם המשחק (יופיע על המסך)</label>
+    <input id="title" placeholder="לדוגמה: טריוויה משפחת כהן">
+    <label>מספר שחקנים מקסימלי</label>
+    <input id="max" type="number" value="8" min="1" max="100">
+    <label>הקישור בתוקף למשך (ימים)</label>
+    <input id="days" type="number" value="7" min="1" max="365">
+    <button onclick="create()">צור קישור</button>
+    <div class="err" id="err"></div>
+    <div id="out" style="display:none">
+      <div class="link" id="link"></div>
+      <button onclick="navigator.clipboard.writeText(document.getElementById('link').textContent); this.textContent='הועתק ✓'">העתק קישור</button>
+      <button onclick="window.open(document.getElementById('link').textContent)" style="background:#16a34a">פתח</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>משחקים פעילים עכשיו</h2>
+    <table><thead><tr><th>משחק</th><th>מצב</th><th>מחוברים</th></tr></thead><tbody id="games"></tbody></table>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+$('key').value = localStorage.getItem('adminKey') || '';
+$('key').onchange = () => localStorage.setItem('adminKey', $('key').value);
+async function post(path, body) {
+  const r = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: $('key').value, ...body }) });
+  return r.json();
+}
+async function create() {
+  localStorage.setItem('adminKey', $('key').value);
+  const r = await post('/api/admin/create', { title: $('title').value, maxPlayers: $('max').value, days: $('days').value });
+  $('err').textContent = r.error || '';
+  if (r.link) { $('link').textContent = r.link; $('out').style.display = 'block'; }
+}
+const statusName = { setup:'הכנה', lobby:'ממתינים לשחקנים', question:'שאלה', reveal:'תשובה', finished:'הסתיים' };
+async function load() {
+  if (!$('key').value) return;
+  const r = await post('/api/admin/games', {});
+  if (Array.isArray(r)) $('games').innerHTML = r.map(g => `<tr><td>${esc(g.title || '—')}</td><td>${statusName[g.status]}</td><td>${g.connected}/${g.players}</td></tr>`).join('') || '<tr><td colspan="3">אין</td></tr>';
+}
+setInterval(load, 3000); load();
+</script>
+</body>
+</html>
