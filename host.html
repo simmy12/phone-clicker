@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מסך מנחה - חידון טלפוני</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, Arial, sans-serif; background: #0f172a; color: #e2e8f0; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: #1e293b; }
+  h1 { margin: 0; font-size: 22px; }
+  .stats { display: flex; gap: 24px; font-size: 18px; }
+  .stats b { color: #38bdf8; font-size: 24px; }
+  main { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; padding: 20px 24px; }
+  .card { background: #1e293b; border-radius: 12px; padding: 20px; }
+  .status { font-size: 15px; color: #94a3b8; margin-bottom: 8px; }
+  .qtext { font-size: 30px; font-weight: 700; margin-bottom: 20px; min-height: 40px; }
+  .opt { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 10px; border-radius: 8px; background: #334155; font-size: 20px; position: relative; overflow: hidden; }
+  .opt .key { background: #0ea5e9; color: #fff; border-radius: 6px; width: 34px; height: 34px; display: grid; place-items: center; font-weight: 700; z-index: 1; }
+  .opt .label { z-index: 1; flex: 1; }
+  .opt .cnt { z-index: 1; font-weight: 700; }
+  .opt .bar { position: absolute; inset: 0 auto 0 0; background: #475569; transition: width .4s; }
+  .opt.correct { outline: 3px solid #22c55e; }
+  .opt.correct .key { background: #22c55e; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+  button { font-size: 17px; padding: 12px 20px; border: 0; border-radius: 8px; cursor: pointer; background: #0ea5e9; color: #fff; font-weight: 600; }
+  button.secondary { background: #475569; }
+  button.danger { background: #b91c1c; }
+  button:disabled { opacity: .4; cursor: default; }
+  table { width: 100%; border-collapse: collapse; font-size: 17px; }
+  td, th { padding: 8px; text-align: right; border-bottom: 1px solid #334155; }
+  tr.first td { color: #facc15; font-weight: 700; }
+  tr.second td { color: #cbd5e1; font-weight: 700; }
+  .grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { padding: 4px 8px; border-radius: 6px; font-size: 13px; background: #334155; }
+  .chip.on { background: #166534; }
+  .chip.done { background: #0369a1; }
+  .chip.off { opacity: .4; }
+  #login { max-width: 360px; margin: 120px auto; text-align: center; }
+  #login input { font-size: 20px; padding: 10px; width: 100%; margin: 14px 0; border-radius: 8px; border: 0; text-align: center; }
+  .note { color: #94a3b8; font-size: 14px; margin-top: 12px; }
+  h2 { margin: 0 0 12px; font-size: 20px; }
+</style>
+</head>
+<body>
+<div id="login" class="card" style="display:none">
+  <h2>מסך מנחה</h2>
+  <input id="keyInput" type="password" placeholder="סיסמת מנחה">
+  <button onclick="saveKey()">כניסה</button>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>חידון טלפוני</h1>
+    <div class="stats">
+      <div>מחוברים: <b id="connected">0</b></div>
+      <div>ענו: <b id="answered">0</b></div>
+    </div>
+  </header>
+  <main>
+    <section>
+      <div class="card">
+        <div class="status" id="status"></div>
+        <div class="qtext" id="qtext"></div>
+        <div id="options"></div>
+        <div class="buttons">
+          <button id="btnNext" onclick="act('next')">פתח שאלה הבאה</button>
+          <button id="btnClose" onclick="act('close')">סגור שאלה והצג תשובה</button>
+          <button id="btnFinish" class="secondary" onclick="act('finish')">סיים חידון</button>
+          <button class="danger" onclick="if(confirm('לאפס את החידון?')) act('reset')">איפוס</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:20px">
+        <h2>משתתפים</h2>
+        <div class="grid" id="grid"></div>
+        <div class="buttons">
+          <button class="secondary" onclick="simulate()">בדיקה: הוסף 20 משתתפים מדומים</button>
+        </div>
+        <div class="note" id="pushNote"></div>
+      </div>
+    </section>
+    <section class="card">
+      <h2>טבלת מובילים</h2>
+      <table>
+        <thead><tr><th>#</th><th>משתתף</th><th>נכונות</th><th>זמן</th></tr></thead>
+        <tbody id="board"></tbody>
+      </table>
+    </section>
+  </main>
+</div>
+
+<script>
+let key = localStorage.getItem('hostKey') || '';
+const $ = id => document.getElementById(id);
+
+function saveKey() { key = $('keyInput').value; localStorage.setItem('hostKey', key); start(); }
+
+async function api(path, method = 'GET', body) {
+  const r = await fetch(path, { method, headers: { 'x-host-key': key, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 401) { $('app').style.display = 'none'; $('login').style.display = 'block'; throw new Error('auth'); }
+  return r.json();
+}
+async function act(a) { const r = await api('/api/' + a, 'POST'); if (r.error) alert(r.error); refresh(); }
+async function simulate() { await api('/api/simulate', 'POST', { count: 20 }); refresh(); }
+
+const statusText = { lobby: 'ממתינים לשאלה הראשונה', open: 'השאלה פתוחה - המשתתפים עונים', closed: 'השאלה נסגרה', finished: 'החידון הסתיים' };
+
+function render(s) {
+  $('connected').textContent = s.connected;
+  $('answered').textContent = s.answered;
+  const qn = s.quiz.qIndex >= 0 ? `שאלה ${s.quiz.qIndex + 1} מתוך ${s.total} · ` : '';
+  $('status').textContent = qn + statusText[s.quiz.status];
+  $('qtext').textContent = s.question ? s.question.text : 'ממתינים למשתתפים...';
+  const max = Math.max(1, ...s.counts);
+  $('options').innerHTML = s.question ? s.question.options.map((o, i) => `
+    <div class="opt ${s.question.correct === i + 1 ? 'correct' : ''}">
+      <div class="bar" style="width:${s.quiz.status === 'open' ? 0 : (s.counts[i] / max) * 100}%"></div>
+      <div class="key">${i + 1}</div><div class="label"></div>
+      <div class="cnt">${s.quiz.status === 'open' ? '' : s.counts[i]}</div>
+    </div>`).join('') : '';
+  if (s.question) [...$('options').querySelectorAll('.label')].forEach((el, i) => el.textContent = s.question.options[i]);
+
+  $('btnNext').disabled = s.quiz.status === 'open' || s.quiz.status === 'finished' || s.quiz.qIndex + 1 >= s.total;
+  $('btnClose').disabled = s.quiz.status !== 'open';
+  $('btnFinish').disabled = s.quiz.status === 'open' || s.quiz.status === 'finished';
+
+  $('grid').innerHTML = s.participants.map(p =>
+    `<span class="chip ${!p.connected ? 'off' : p.answered ? 'done' : 'on'}">${p.id}. ${p.phone}</span>`).join('');
+  $('pushNote').textContent = s.pushEnabled ? '' : 'הערה: פרטי Twilio לא הוגדרו, לכן משתתפים ישמעו שאלה חדשה תוך כמה שניות ולא מיד.';
+
+  $('board').innerHTML = s.leaderboard.map((p, i) =>
+    `<tr class="${i === 0 ? 'first' : i === 1 ? 'second' : ''}"><td>${i === 0 ? '🥇' : i === 1 ? '🥈' : i + 1}</td>
+     <td>${p.id}. ${p.phone}</td><td>${p.correct}</td><td>${(p.ms / 1000).toFixed(1)} ש׳</td></tr>`).join('');
+}
+
+async function refresh() { try { render(await api('/api/state')); } catch (e) {} }
+function start() { $('login').style.display = 'none'; $('app').style.display = 'block'; refresh(); }
+
+if (key) start(); else $('login').style.display = 'block';
+setInterval(() => { if (key && $('app').style.display !== 'none') refresh(); }, 1000);
+</script>
+</body>
+</html>
