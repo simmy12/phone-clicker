@@ -1,0 +1,13 @@
+{
+ "id": "hanukkah",
+ "title": "טריוויה חנוכה",
+ "subtitle": "שעשועון הקליקרים הטלפוני",
+ "roundSize": 5,
+ "decor": [
+  "dreidel.webp",
+  "donut.webp",
+  "oil.webp",
+  "coins.webp"
+ ],
+ "bonusImage": "bonus.webp"
+}
