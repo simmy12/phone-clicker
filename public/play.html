@@ -27,6 +27,17 @@
       <button data-act="sound" id="tbSound" title="צלילים (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg></button>
       <button data-act="end" title="סיום"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg></button>
     </div>
+    <div id="confirmEnd" class="hidden">
+      <div class="welcome-box confirm-box">
+        <div class="confirm-icon">⚠️</div>
+        <div class="welcome-title" data-t="endTitle"></div>
+        <div class="welcome-text" data-t="endText"></div>
+        <div class="confirm-btns">
+          <button class="btn danger" id="endYes" data-t="endYes"></button>
+          <button class="btn ghost" id="endNo" data-t="endNo"></button>
+        </div>
+      </div>
+    </div>
     <div id="welcome">
       <div class="welcome-box">
         <div class="welcome-title" data-t="welcomeTitle"></div>

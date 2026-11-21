@@ -29,7 +29,7 @@ function showErr(r) {
 
 // ---------- audio: real files if present, otherwise generated sounds ----------
 const audio = (() => {
-  let ac = null, on = true, music = null, musicName = '', synthLoop = null, unlocked = false, want = '';
+  const live = new Set(); let ac = null, on = true, music = null, musicName = '', synthLoop = null, unlocked = false, want = '';
   const files = {}, missing = new Set();
   const theme = () => (S && S.theme.id) || 'hanukkah';
   function unlock() {
@@ -77,7 +77,7 @@ const audio = (() => {
     if (!on || !unlocked) return;
     if (NO_FILE.has(name)) { (SYN[name] || (() => {}))(); return; }
     const a = file(name);
-    if (a && a.readyState >= 2) { const c = a.cloneNode(); c.volume = .8; c.play().catch(() => {}); return; }
+    if (a && a.readyState >= 2) { const c = a.cloneNode(); c.volume = .8; live.add(c); c.onended = () => live.delete(c); c.play().catch(() => {}); return; }
     (SYN[name] || (() => {}))();
   }
   const LOOPS = {   // generated fallback music
@@ -119,18 +119,29 @@ const audio = (() => {
     setTimeout(() => { if (musicName === name && missing.has(name)) synthMusic(SYN_OF[name] || name); }, 2500);
   }
   function stop() { if (music) { music.pause(); music = null; } clearInterval(synthLoop); synthLoop = null; musicName = ''; }
-  function toggle() { on = !on; if (on) { unlock(); start(want); } else { stop(); try { speechSynthesis.cancel(); } catch {} } return on; }
+  function toggle() {
+    on = !on;
+    if (on) { unlock(); if (ac) ac.resume(); start(want); }
+    else {
+      stop(); live.forEach(c => c.pause()); live.clear();
+      try { speechSynthesis.cancel(); } catch {}
+      if (ac) ac.suspend();   // cuts generated sounds that are already playing
+    }
+    return on;
+  }
   function say(name, text) {   // announcer: a recorded file if there is one, otherwise the computer voice
     if (!on) return;
     const a = file(name);
     duck(3500);
-    if (a && a.readyState >= 2) { const c = a.cloneNode(); c.volume = 1; c.play().catch(() => {}); return; }
+    if (a && a.readyState >= 2) { const c = a.cloneNode(); c.volume = 1; live.add(c); c.onended = () => live.delete(c); c.play().catch(() => {}); return; }
     try { const u = new SpeechSynthesisUtterance(text); u.lang = 'he-IL'; u.rate = .9; u.pitch = .8; u.volume = 1; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch {}
   }
   return { unlock, sfx, play, stop, toggle, duck, say, preload: names => names.forEach(file), get on() { return on; } };
 })();
 document.addEventListener('pointerdown', () => audio.unlock());
 // welcome note: one click turns on sound and full screen
+$('endYes').onclick = () => { $('confirmEnd').classList.add('hidden'); act('end'); };
+$('endNo').onclick = () => $('confirmEnd').classList.add('hidden');
 $('welcomeOk').onclick = () => {
   audio.unlock();
   if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
@@ -262,7 +273,7 @@ function doAct(a) {
   if (a === 'pause') act(S.paused ? 'resume' : 'pause');
   if (a === 'full') { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); else document.exitFullscreen(); }
   if (a === 'sound') $('tbSound').classList.toggle('muted', !audio.toggle());
-  if (a === 'end' && confirm(t('confirmEnd'))) act('end');
+  if (a === 'end') $('confirmEnd').classList.remove('hidden');
 }
 $('toolbar').onclick = e => { const b = e.target.closest('button'); if (b) doAct(b.dataset.act); };
 document.addEventListener('keydown', e => {
@@ -516,7 +527,7 @@ function renderFinal() {
   }, at));
   $('finalFoot').innerHTML = S.kind === 'demo'
     ? `${esc(t('demoDone'))}<br><button class="btn gold" id="againBtn">${esc(t('demoAgain'))}</button>`
-    : esc(t('finalSub')) + (S.kind === 'preview' ? `<br><button class="btn gold" id="againBtn">${esc(t('demoAgain'))}</button>` : '');
+    : esc(t('finalSub'));
   const ab = $('againBtn'); if (ab) ab.onclick = () => act('again');
 }
 

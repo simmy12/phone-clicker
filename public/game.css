@@ -540,3 +540,10 @@ input, select { font-family:"Rubik"; font-weight:600; border:2px solid rgba(255,
 .brow.crowned .crown { opacity:1; transform:none; }
 .brow .up { display:none !important; } .brow.moved .up { display:inline-block !important; font-weight:900; }
 .brow.still > img { visibility:hidden; }
+
+#confirmEnd { position:absolute; inset:0; z-index:85; display:grid; place-items:center; background:rgba(5,3,25,.75); backdrop-filter:blur(6px); }
+.confirm-box { animation:pop .4s; } .confirm-icon { font-size:80px; margin-bottom:6px; }
+.confirm-btns { display:flex; gap:24px; justify-content:center; }
+.btn.danger { font-family:"Rubik"; font-weight:900; font-size:34px; border-radius:80px; border:4px solid rgba(255,255,255,.75); color:#fff; padding:18px 44px;
+  background:linear-gradient(180deg,#fb7185,#e11d48 50%,#9f1239); box-shadow:0 9px 0 #6b0f2a, 0 18px 30px rgba(0,0,0,.45); text-shadow:0 2px 0 rgba(0,0,0,.3); }
+#confirmEnd .btn.ghost { font-size:30px; padding:18px 40px; border-radius:80px; }
