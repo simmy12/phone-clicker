@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ניהול משחקים</title>
+<style>
+  body { margin:0; font-family:"Segoe UI",Arial,sans-serif; background:#f3f1fb; color:#1f1b3a; }
+  .wrap { max-width:820px; margin:36px auto; padding:0 20px; }
+  .card { background:#fff; border-radius:16px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.06); margin-bottom:20px; }
+  h1 { margin:0 0 20px; } h2 { margin:0 0 14px; font-size:22px; }
+  label { display:block; margin:12px 0 4px; font-weight:600; }
+  input, select { font:inherit; font-size:17px; padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box; }
+  .grid { display:grid; grid-template-columns:2fr 1fr 1fr; gap:14px; }
+  button { font:inherit; font-size:17px; font-weight:700; padding:12px 22px; border:0; border-radius:10px; background:#7c3aed; color:#fff; cursor:pointer; margin-top:16px; }
+  button.sm { font-size:14px; padding:6px 12px; margin:0 0 0 6px; background:#ede9fe; color:#5b21b6; }
+  .link { display:flex; align-items:center; gap:8px; margin-top:12px; padding:12px; background:#f5f3ff; border-radius:10px; }
+  .link b { white-space:nowrap; } .link code { flex:1; direction:ltr; font-size:12px; word-break:break-all; }
+  .msg { margin-top:16px; padding:14px; border-radius:10px; background:#ecfdf5; white-space:pre-line; font-size:15px; }
+  .err { color:#b91c1c; margin-top:10px; }
+  table { width:100%; border-collapse:collapse; font-size:15px; } td, th { padding:8px; border-bottom:1px solid #eee; text-align:right; }
+  .st { padding:2px 10px; border-radius:20px; font-size:13px; } .st.new { background:#e0f2fe; } .st.play { background:#fef3c7; } .st.done { background:#dcfce7; }
+  .hint { color:#6b7280; font-size:14px; margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ניהול משחקים</h1>
+  <div class="card">
+    <label>סיסמת ניהול</label>
+    <input id="key" type="password">
+  </div>
+  <div class="card">
+    <h2>משחק חדש ללקוח</h2>
+    <div class="grid">
+      <div><label>שם (יופיע על המסך)</label><input id="title" placeholder="לדוגמה: הטריוויה של משפחת כהן"></div>
+      <div><label>מספר שחקנים</label><input id="max" type="number" value="8" min="1" max="100"></div>
+      <div><label>תוקף (ימים)</label><input id="days" type="number" value="30" min="1" max="365"></div>
+    </div>
+    <div class="hint">הלקוח מקבל שני קישורים: קישור ניסיון (3 שאלות, אפשר לנסות כמה פעמים) וקישור למשחק האמיתי (פעם אחת בלבד).</div>
+    <button onclick="create()">צור קישורים</button>
+    <div class="err" id="err"></div>
+    <div id="out" style="display:none">
+      <div class="link"><b>🧪 ניסיון:</b><code id="demo"></code><button class="sm" onclick="copy('demo',this)">העתק</button><button class="sm" onclick="open1('demo')">פתח</button></div>
+      <div class="link"><b>🎮 המשחק:</b><code id="real"></code><button class="sm" onclick="copy('real',this)">העתק</button><button class="sm" onclick="open1('real')">פתח</button></div>
+      <div class="msg" id="msgText"></div>
+      <button class="sm" onclick="copy('msgText',this)">העתק הודעה ללקוח</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>משחקים</h2>
+    <table><thead><tr><th>שם</th><th>שחקנים</th><th>מצב</th><th>התחיל</th></tr></thead><tbody id="games"></tbody></table>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+$('key').value = localStorage.getItem('adminKey') || '';
+$('key').onchange = () => { localStorage.setItem('adminKey', $('key').value); load(); };
+async function post(path, body) {
+  const r = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: $('key').value, ...body }) });
+  return r.json();
+}
+async function create() {
+  localStorage.setItem('adminKey', $('key').value);
+  const r = await post('/api/admin/create', { title: $('title').value, maxPlayers: $('max').value, days: $('days').value });
+  $('err').textContent = r.error || '';
+  if (!r.real) return;
+  $('real').textContent = r.real; $('demo').textContent = r.demo; $('out').style.display = 'block';
+  $('msgText').textContent =
+`שלום! הנה המשחק שלכם 🎉
+
+🧪 קישור ניסיון (3 שאלות, אפשר לנסות כמה פעמים):
+${r.demo}
+
+🎮 המשחק האמיתי (פעם אחת בלבד, פתחו אותו רק כשכולם מוכנים):
+${r.real}
+
+איך משחקים: פותחים את הקישור במחשב שמחובר למסך, רושמים שמות ומספרי טלפון, כולם מתקשרים למספר שעל המסך ומחכים לצפצוף, ועונים בלחיצה על מספר התשובה. בהצלחה!`;
+  load();
+}
+function copy(id, btn) { navigator.clipboard.writeText($(id).textContent); const t = btn.textContent; btn.textContent = 'הועתק ✓'; setTimeout(() => btn.textContent = t, 1500); }
+function open1(id) { window.open($(id).textContent); }
+const stName = g => g.status === 'finished' ? ['done','הסתיים'] : g.used ? ['play','משחקים עכשיו'] : g.status === 'lobby' ? ['new','בחדר ההמתנה'] : ['new','טרם התחיל'];
+async function load() {
+  if (!$('key').value) return;
+  const r = await post('/api/admin/games', {});
+  if (!Array.isArray(r)) { $('err').textContent = r.error || ''; return; }
+  $('games').innerHTML = r.map(g => { const [c, n] = stName(g);
+    return `<tr><td>${esc(g.title || '—')}</td><td>${g.connected}/${g.players || 0} (עד ${g.max})</td><td><span class="st ${c}">${n}</span></td><td>${g.startedAt ? new Date(g.startedAt).toLocaleString('he-IL') : ''}</td></tr>`; }).join('') || '<tr><td colspan="4">אין עדיין</td></tr>';
+}
+load(); setInterval(load, 5000);
+</script>
+</body>
+</html>

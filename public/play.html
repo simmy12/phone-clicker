@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>טריוויה</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="game.css">
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <div id="bg" class="bg"></div>
+    <div id="bg2" class="bg"></div>
+    <div class="vignette"></div>
+    <div id="decor"></div>
+    <canvas id="fx" width="1920" height="1080"></canvas>
+
+    <!-- host toolbar -->
+    <div id="toolbar" class="hidden">
+      <span id="tbInfo"></span>
+      <button data-act="next" title="הבא (רווח)">⏭</button>
+      <button data-act="pause" id="tbPause" title="השהיה (P)">⏸</button>
+      <button data-act="full" title="מסך מלא (F)">⛶</button>
+      <button data-act="sound" id="tbSound" title="צלילים (M)">🔊</button>
+      <button data-act="end" title="סיום">⏹</button>
+    </div>
+
+    <!-- setup -->
+    <section id="s-setup" class="screen">
+      <div class="glass setup-panel">
+        <div class="logo-sm" id="setupTitle"></div>
+        <div class="muted" data-t="setupHint"></div>
+        <div class="roster" id="rows"></div>
+        <div class="row setup-foot">
+          <label data-t="modeLabel"></label>
+          <select id="mode"><option value="auto" data-t="modeAuto"></option><option value="manual" data-t="modeManual"></option></select>
+          <span id="secWrap" class="row"><input id="seconds" type="number" min="8" max="60" value="20"> <span data-t="seconds"></span></span>
+          <div class="spacer"></div>
+          <button class="btn gold" id="toLobby" data-t="toLobby"></button>
+        </div>
+        <div class="err" id="setupErr"></div>
+      </div>
+      <div class="glass demo-steps hidden" id="demoSteps"></div>
+    </section>
+
+    <!-- lobby -->
+    <section id="s-lobby" class="screen">
+      <div class="beam b1"></div><div class="beam b2"></div>
+      <div class="lobby-title" id="logo"></div>
+      <div class="lobby-sub" id="subRibbon"></div>
+      <div class="holo-wrap"><div class="holo">
+        <div class="holo-lbl" data-t="callUs"></div>
+        <div class="holo-num" id="phoneNum"></div>
+        <div class="holo-steps">
+          <div><span class="orb">📞</span><i data-t="step1"></i></div>
+          <div><span class="orb">🔔</span><i data-t="step2"></i></div>
+          <div><span class="orb">🔢</span><i data-t="step3"></i></div>
+        </div>
+      </div></div>
+      <div class="arc" id="lobbyChips"></div>
+      <div class="lobby-foot">
+        <button class="btn ghost" id="editBtn" data-t="editPlayers"></button>
+        <div class="line-warn hidden" id="lineWarn" data-t="lineWarn"></div>
+        <div class="spacer"></div>
+        <div class="counter"><b id="lobbyOn">0</b><span>/</span><span id="lobbyTotal">0</span><small data-t="onLineShort"></small></div>
+        <button class="btn go" id="startBtn" data-t="start"></button>
+      </div>
+    </section>
+
+    <!-- intro -->
+    <section id="s-intro" class="screen center">
+      <img id="introBonusImg" class="intro-bonus-img hidden" alt="">
+      <div class="intro-txt" id="introTxt"></div>
+      <div class="intro-sub" id="introSub"></div>
+    </section>
+
+    <!-- memory -->
+    <section id="s-memory" class="screen center">
+      <div class="mem-title" data-t="memoryTitle"></div>
+      <div class="mem-frame"><img id="memImg" alt=""></div>
+      <div class="mem-bar"><b id="memBar"></b></div>
+    </section>
+
+    <!-- question + reveal -->
+    <section id="s-quiz" class="screen">
+      <div class="q-top">
+        <div class="q-badge" id="qBadge"></div>
+      </div>
+      <div class="glass q-panel"><div class="q-text" id="qText" dir="auto"></div></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="timer" id="timer">
+        <svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="86" class="t-bg"/><circle cx="100" cy="100" r="86" class="t-fg" id="ring"/></svg>
+        <div class="t-num" id="tNum"></div>
+      </div>
+      <div class="jar" id="jar">
+        <div class="jar-glass" id="jarCoins"></div>
+        <div class="jar-lbl"><b id="jarNum">0</b> / <span id="jarTotal">0</span> <span data-t="jar"></span></div>
+      </div>
+      <div class="press-hint" data-t="pressKey"></div>
+      <div class="bonus-names hidden" id="bonusNames"></div>
+    </section>
+
+    <!-- leaders board -->
+    <section id="s-board" class="screen">
+      <div class="board-title" data-t="leaders"></div>
+      <div class="board" id="boardRows"></div>
+      <div class="round-card smart" id="cardSmart"></div>
+      <div class="round-card fast" id="cardFast"></div>
+    </section>
+
+    <!-- finale -->
+    <section id="s-final" class="screen">
+      <div class="board-title" data-t="winners"></div>
+      <div class="podium-wrap">
+        <div class="pod p3" id="pod3"></div>
+        <div class="pod p1" id="pod1"></div>
+        <div class="pod p2" id="pod2"></div>
+        <img src="themes/base/podium.webp" class="podium-img" alt="">
+      </div>
+      <div class="final-rest" id="finalRest"></div>
+      <div class="final-foot" id="finalFoot"></div>
+    </section>
+
+    <section id="s-msg" class="screen center">
+      <div class="logo-sm" id="msgTitle"></div>
+      <div class="muted big" id="msgSub"></div>
+    </section>
+
+    <div id="pausedOverlay" class="hidden">
+      <div class="glass paused-box">
+        <div class="logo-sm" id="pausedTitle"></div>
+        <button class="btn gold" id="resumeBtn" data-t="resume"></button>
+      </div>
+    </div>
+    <div id="flash"></div>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
