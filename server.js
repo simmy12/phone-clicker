@@ -96,7 +96,18 @@ const mask = p => '•••' + String(p).slice(-4);
 // ---------------- games ----------------
 const games = new Map();
 
+const SIM_NAMES = ['שרה', 'מנחם', 'חיה', 'יוסי', 'רבקה', 'דוד', 'אהרן', 'לאה'];
 function newGame(info) {
+  if (info.k === 'preview') {
+    const g = { ...baseGame(info), status: 'lobby', mode: 'auto', seconds: 15 };
+    g.players = SIM_NAMES.slice(0, 6).map((name, i) => ({ name, phone: '+1000000000' + i, sim: true, skill: .45 + i * .08,
+      connected: false, lastSeen: 0, callSid: '', answers: {} }));
+    g.players.forEach((p, i) => setTimeout(() => { p.connected = true; p.lastSeen = Date.now(); }, 1500 + i * 1300));
+    return g;
+  }
+  return baseGame(info);
+}
+function baseGame(info) {
   return {
     id: info.id, kind: info.k || 'real', theme: info.th || 'hanukkah', title: info.title || '',
     max: info.k === 'demo' ? DEMO_MAX : info.max, status: 'setup', phase: null, qIndex: -1,
@@ -132,7 +143,7 @@ async function getGame(info) {
 
 const questionsOf = g => { const th = loadTheme(g.theme); return g.kind === 'demo' ? th.demo : th.questions; };
 const roundSize = g => g.kind === 'demo' ? 999 : (loadTheme(g.theme).roundSize || 5);
-const isConnected = p => p.connected && Date.now() - p.lastSeen < STALE_MS;
+const isConnected = p => p.connected && (p.sim || Date.now() - p.lastSeen < STALE_MS);
 const isLive = g => g.status === 'lobby' || g.status === 'play';
 
 function findPlayer(phone) {
@@ -154,6 +165,7 @@ function setPhase(g, phase, len) {
   g.phaseEnd = len ? Date.now() + len : 0;
   g.paused = false; g.resumed = false;
   if (len) g.timer = setTimeout(() => advance(g), len);
+  if (phase === 'question' && g.kind === 'preview') simAnswers(g);
   g.updatedAt = Date.now();
   save(g);
 }
@@ -197,6 +209,24 @@ function resume(g) {
   if (g.pausedLeft) { g.phaseEnd = Date.now() + g.pausedLeft; g.timer = setTimeout(() => advance(g), g.pausedLeft); }
   else if (['intro', 'memory'].includes(g.phase)) advance(g);   // timed phases always move on
   save(g);
+}
+
+function recordAnswer(g, p, digit) {
+  const q = questionsOf(g)[g.qIndex];
+  const ms = Date.now() - (g.phaseStartedAt || Date.now());
+  const limit = (g.mode === 'auto' ? g.seconds : 30) * 1000;
+  const pts = digit === q.correct ? Math.round((500 + 500 * Math.max(0, 1 - ms / limit)) * (q.bonus ? 2 : 1)) : 0;
+  p.answers[g.qIndex] = { digit, ms: Math.max(0, ms), points: pts };
+  g.updatedAt = Date.now(); save(g);
+  if (allAnswered(g) && !g.paused) advance(g);
+}
+function simAnswers(g) {
+  const qi = g.qIndex, q = questionsOf(g)[qi];
+  g.players.filter(p => p.sim).forEach(p => setTimeout(() => {
+    if (g.status !== 'play' || g.phase !== 'question' || g.qIndex !== qi || p.answers[qi] || g.paused) return;
+    const digit = Math.random() < p.skill ? q.correct : 1 + Math.floor(Math.random() * q.options.length);
+    recordAnswer(g, p, digit);
+  }, 1500 + Math.random() * 9000));
 }
 
 function allAnswered(g) {
@@ -321,13 +351,8 @@ app.post('/answer', twilioOnly, (req, res) => {
     if (!f) { play(r, 'end'); r.hangup(); return; }
     const { g, p } = f, q = questionsOf(g)[g.qIndex];
     if (g.status === 'play' && g.phase === 'question' && !p.answers[g.qIndex] && digit >= 1 && digit <= q.options.length) {
-      const ms = Date.now() - (g.phaseStartedAt || Date.now());
-      const limit = (g.mode === 'auto' ? g.seconds : 30) * 1000;
-      const pts = digit === q.correct ? Math.round((500 + 500 * Math.max(0, 1 - ms / limit)) * (q.bonus ? 2 : 1)) : 0;
-      p.answers[g.qIndex] = { digit, ms: Math.max(0, ms), points: pts };
-      g.updatedAt = Date.now(); save(g);
       play(r, 'ok');
-      if (allAnswered(g) && !g.paused) advance(g);
+      recordAnswer(g, p, digit);
     } else {
       play(r, 'no');
     }
@@ -421,10 +446,11 @@ app.post('/api/game/end', withGame, (req, res) => { if (req.game.status === 'pla
 
 app.post('/api/game/again', withGame, (req, res) => {     // only demo games can be played again
   const g = req.game;
-  if (g.kind !== 'demo') return res.status(400).json({ error: 'linkUsed' });
+  if (g.kind === 'real') return res.status(400).json({ error: 'linkUsed' });
   clearTimer(g); clearTimeout(g.limitTimer);
   Object.assign(g, { status: 'lobby', phase: null, qIndex: -1, paused: false, used: false });
   g.players.forEach(p => { p.answers = {}; });
+  if (g.kind === 'preview') g.mode = 'auto';
   save(g); res.json({ ok: true });
 });
 
@@ -453,6 +479,11 @@ app.post('/api/admin/create', adminOnly, (req, res) => {
   const demo = makeToken({ ...base, id: id + '-demo', k: 'demo', max: DEMO_MAX });
   store.set(id, snapshot(newGame({ id, k: 'real', th: theme, title: base.title, max: parseInt(req.body.maxPlayers, 10) || 8 }))).catch(() => {});
   res.json({ real: `${baseOf(req)}/play.html?t=${real}`, demo: `${baseOf(req)}/play.html?t=${demo}` });
+});
+
+app.post('/api/admin/preview', adminOnly, (req, res) => {   // a sample game with fake players, to see how it looks
+  const t = makeToken({ id: 'preview-' + crypto.randomBytes(4).toString('hex'), k: 'preview', th: 'hanukkah', title: 'משחק לדוגמה', max: 8, exp: Date.now() + 86400000 });
+  res.json({ link: `${baseOf(req)}/play.html?t=${t}` });
 });
 
 app.post('/api/admin/games', adminOnly, async (req, res) => {
