@@ -446,7 +446,7 @@ app.post('/api/game/end', withGame, (req, res) => { if (req.game.status === 'pla
 
 app.post('/api/game/again', withGame, (req, res) => {     // only demo games can be played again
   const g = req.game;
-  if (g.kind === 'real') return res.status(400).json({ error: 'linkUsed' });
+  if (g.kind === 'real') return res.status(400).json({ error: 'linkUsed' });   // the real game plays once; demo and preview can repeat
   clearTimer(g); clearTimeout(g.limitTimer);
   Object.assign(g, { status: 'lobby', phase: null, qIndex: -1, paused: false, used: false });
   g.players.forEach(p => { p.answers = {}; });
