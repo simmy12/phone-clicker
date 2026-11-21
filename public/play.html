@@ -27,7 +27,14 @@
       <button data-act="sound" id="tbSound" title="צלילים (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg></button>
       <button data-act="end" title="סיום"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg></button>
     </div>
-    <button id="soundPrompt" class="hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg><span data-t="soundOn"></span></button>
+    <div id="welcome">
+      <div class="welcome-box">
+        <div class="welcome-title" data-t="welcomeTitle"></div>
+        <div class="welcome-text" data-t="welcomeText"></div>
+        <button class="btn go" id="welcomeOk" data-t="welcomeOk"></button>
+        <div class="welcome-hint" data-t="welcomeHint"></div>
+      </div>
+    </div>
 
     <!-- setup -->
     <section id="s-setup" class="screen">
@@ -107,8 +114,6 @@
     <section id="s-board" class="screen">
       <div class="board-title" data-t="leaders"></div>
       <div class="board" id="boardRows"></div>
-      <div class="round-card smart" id="cardSmart"></div>
-      <div class="round-card fast" id="cardFast"></div>
     </section>
 
     <!-- finale -->
@@ -135,6 +140,7 @@
         <button class="btn gold" id="resumeBtn" data-t="resume"></button>
       </div>
     </div>
+    <div id="sideCards" class="out"></div>
     <div id="flash"></div>
   </div>
 </div>

@@ -29,15 +29,13 @@ function showErr(r) {
 
 // ---------- audio: real files if present, otherwise generated sounds ----------
 const audio = (() => {
-  let ac = null, on = true, music = null, musicName = '', synthLoop = null, unlocked = false;
+  let ac = null, on = true, music = null, musicName = '', synthLoop = null, unlocked = false, want = '';
   const files = {}, missing = new Set();
   const theme = () => (S && S.theme.id) || 'hanukkah';
   function unlock() {
     if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
     if (ac.state === 'suspended') ac.resume();
-    unlocked = true; document.getElementById('soundPrompt').classList.add('hidden');
-    if (music && music.paused && on) music.play().catch(() => {});   // music that the browser blocked before the first click
-    else if (!music && musicName && on) { const n = musicName; musicName = ''; play(n); }
+    if (!unlocked) { unlocked = true; if (on && want) start(want); }
   }
   function file(name) {
     if (missing.has(name)) return null;
@@ -71,10 +69,13 @@ const audio = (() => {
     reveal: () => { tone(659, 0, .12); tone(784, .1, .12); tone(1047, .2, .5); },
     bonus: () => [523,659,784,1047,1319,1568].forEach((f, i) => tone(f, i * .07, .25, 'sine', .12)),
     drumroll: () => { for (let i = 0; i < 26; i++) noise(i * .07, .06, .05 + i * .004); },
+    countdown: () => { let t0 = 0; for (let i = 0; i < 14; i++) { const gap = .22 - i * .012; tone(i % 2 ? 1180 : 880, t0, .05, 'square', .035 + i * .002); t0 += gap; } },
     applause: () => { for (let i = 0; i < 40; i++) noise(Math.random() * 2, .05, .05); },
   };
+  const NO_FILE = new Set(['countdown']);
   function sfx(name) {
-    if (!on) return;
+    if (!on || !unlocked) return;
+    if (NO_FILE.has(name)) { (SYN[name] || (() => {}))(); return; }
     const a = file(name);
     if (a && a.readyState >= 2) { const c = a.cloneNode(); c.volume = .8; c.play().catch(() => {}); return; }
     (SYN[name] || (() => {}))();
@@ -103,19 +104,38 @@ const audio = (() => {
     const v = VOL[musicName] || .5, m = music; m.volume = v * .2;
     clearTimeout(duck.t); duck.t = setTimeout(() => { if (m === music) m.volume = v; }, ms);
   }
-  function play(name) {
-    if (musicName === name) return;
-    stop(); musicName = name; if (!name || !on) return;
+  function play(name) {          // the track this moment should have
+    want = name;
+    if (musicName === name && (music ? !music.paused : synthLoop)) return;
+    start(name);
+  }
+  function start(name) {
+    stop(); if (!name || !on || !unlocked) return;
+    musicName = name;
     const a = file(name);
-    if (a) { music = a; a.loop = true; a.volume = VOL[name] || .5; a.currentTime = 0; a.play().catch(() => { if (missing.has(name)) synthMusic(SYN_OF[name] || name); else if (!unlocked) document.getElementById('soundPrompt').classList.remove('hidden'); }); setTimeout(() => { if (musicName === name && missing.has(name)) synthMusic(SYN_OF[name] || name); }, 2500); }
-    else synthMusic(SYN_OF[name] || name);
+    if (!a) return synthMusic(SYN_OF[name] || name);
+    music = a; a.loop = true; a.volume = VOL[name] || .5; a.currentTime = 0;
+    a.play().catch(() => {});
+    setTimeout(() => { if (musicName === name && missing.has(name)) synthMusic(SYN_OF[name] || name); }, 2500);
   }
   function stop() { if (music) { music.pause(); music = null; } clearInterval(synthLoop); synthLoop = null; musicName = ''; }
-  function toggle() { on = !on; const n = musicName; stop(); if (on) play(n); return on; }
-  return { unlock, sfx, play, stop, toggle, duck, preload: names => names.forEach(file), get on() { return on; } };
+  function toggle() { on = !on; if (on) { unlock(); start(want); } else { stop(); try { speechSynthesis.cancel(); } catch {} } return on; }
+  function say(name, text) {   // announcer: a recorded file if there is one, otherwise the computer voice
+    if (!on) return;
+    const a = file(name);
+    duck(3500);
+    if (a && a.readyState >= 2) { const c = a.cloneNode(); c.volume = 1; c.play().catch(() => {}); return; }
+    try { const u = new SpeechSynthesisUtterance(text); u.lang = 'he-IL'; u.rate = .9; u.pitch = .8; u.volume = 1; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch {}
+  }
+  return { unlock, sfx, play, stop, toggle, duck, say, preload: names => names.forEach(file), get on() { return on; } };
 })();
 document.addEventListener('pointerdown', () => audio.unlock());
-$('soundPrompt').onclick = () => audio.unlock();
+// welcome note: one click turns on sound and full screen
+$('welcomeOk').onclick = () => {
+  audio.unlock();
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  $('welcome').classList.add('hidden');
+};
 
 // ---------- particles: gold dust, confetti, fireworks ----------
 const fx = (() => {
@@ -133,8 +153,24 @@ const fx = (() => {
       parts.push({ k: 'spark', x: cx, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, c: col, life: 70 + Math.random() * 40 }); }
   }
   function show(n = 6, every = 450) { for (let i = 0; i < n; i++) setTimeout(() => firework(300 + Math.random() * 1320, 150 + Math.random() * 400), i * every); }
-  function frame() {
+  let lightsOn = false;
+  function lights(v) { lightsOn = v; }
+  function drawLights(tm) {
+    const cols = ['255,220,120', '140,235,255', '200,140,255', '255,220,120'];
+    x.save(); x.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 4; i++) {
+      const ox = 260 + i * 460, ang = Math.sin(tm / 1400 + i * 1.7) * .45, len = 1250;
+      const tx = ox + Math.sin(ang) * len, ty = Math.cos(ang) * len, w = 170;
+      const g = x.createLinearGradient(ox, 0, tx, ty);
+      g.addColorStop(0, `rgba(${cols[i]},.42)`); g.addColorStop(1, `rgba(${cols[i]},0)`);
+      x.fillStyle = g; x.beginPath(); x.moveTo(ox - 14, -10); x.lineTo(ox + 14, -10);
+      x.lineTo(tx + w * Math.cos(ang), ty - w * Math.sin(ang)); x.lineTo(tx - w * Math.cos(ang), ty + w * Math.sin(ang)); x.closePath(); x.fill();
+    }
+    x.restore();
+  }
+  function frame(tm) {
     x.clearRect(0, 0, 1920, 1080);
+    if (lightsOn) drawLights(tm || 0);
     parts = parts.filter(p => {
       if (p.k === 'dust') {
         p.x += p.vx; p.y += p.vy; p.a += .02; if (p.y < -10) { p.y = 1090; p.x = Math.random() * 1920; }
@@ -152,7 +188,7 @@ const fx = (() => {
     x.globalAlpha = 1; requestAnimationFrame(frame);
   }
   frame();
-  return { confetti, show, firework };
+  return { confetti, show, firework, lights };
 })();
 
 // ---------- helpers ----------
@@ -178,7 +214,7 @@ function preload() {
   const th = S.theme.id, imgs = ['bg-main', 'bg-gold'].map(n => `themes/${th}/${n}.webp`)
     .concat(['trophy-gold','trophy-silver','trophy-bronze','badge-fast','badge-smart','podium','coin'].map(n => `themes/base/${n}.webp`));
   imgs.forEach(src => { const i = new Image(); i.src = src; });
-  audio.preload(['drumroll', 'applause', 'game1', 'final']);
+  audio.preload(['applause', 'game1', 'final', 'announce-leaders', 'announce-winners']);
 }
 
 // ---------- marquee light bulbs ----------
@@ -265,6 +301,7 @@ function render() {
   else if (s.phase === 'question') renderQuestion(changed);
   else if (s.phase === 'reveal') { if (changed) renderReveal(); }
   else if (s.phase === 'board') { if (changed) renderBoard(); }
+  if (s.status !== 'finished') fx.lights(s.phase === 'board');
   prevKey = key;
 }
 
@@ -287,12 +324,27 @@ function renderIntro() {
   const q = S.question, bonus = q && q.bonus;
   show('intro'); flash(); push(); $('s-intro').classList.toggle('bonus', !!bonus);
   audio.play(gameTrack()); audio.sfx(bonus ? 'bonus' : 'whoosh');
+  if (S.qIndex === 0 && !bonus && (S.remainingMs || 0) > 4000) return countdown321();
   $('introTxt').textContent = bonus ? t('bonus') : t('question', { n: S.qIndex + 1 });
   $('introSub').textContent = bonus ? t('bonusSub') : ((S.qIndex % S.roundSize === 0 && S.roundSize < 100) ? t('roundOf', { n: Math.floor(S.qIndex / S.roundSize) + 1 }) : '');
   $('introBonusImg').classList.toggle('hidden', !bonus);
   if (bonus) { $('introBonusImg').src = `themes/${S.theme.id}/${S.theme.bonusImage}`; fx.show(3, 350); }
   // preload the memory image so it shows instantly
   if (q && q.image) { const i = new Image(); i.src = `themes/${S.theme.id}/${q.image}`; }
+}
+
+function countdown321() {
+  const el = $('introTxt'); $('introSub').textContent = ''; $('introBonusImg').classList.add('hidden');
+  ['3', '2', '1'].forEach((n, i) => setTimeout(() => {
+    el.textContent = n; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+    el.classList.add('count'); flash(); audio.sfx('tick'); fx.firework(500 + Math.random() * 920, 250 + Math.random() * 300);
+  }, i * 1100));
+  setTimeout(() => {
+    el.classList.remove('count'); el.textContent = t('question', { n: 1 });
+    el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+    flash(); push(); audio.sfx('whoosh'); fx.show(3, 250); fx.confetti(120);
+    $('introSub').textContent = t('roundOf', { n: 1 });
+  }, 3400);
 }
 
 function renderMemory() {
@@ -313,7 +365,7 @@ function renderQuestion(changed) {
     $('qBadge').classList.toggle('bonus', q.bonus);
     $('qText').textContent = q.text;
     $('tiles').classList.remove('reveal');
-    $('tiles').innerHTML = q.options.map((o, i) => `<div class="tile t${i + 1} flip" style="animation-delay:${.35 + i * .22}s"><div class="meter"></div><div class="k">${i + 1}</div><div class="tx">${esc(o)}</div><div class="pct"></div></div>`).join('');
+    $('tiles').innerHTML = q.options.map((o, i) => `<div class="tile t${i + 1} flip" style="animation-delay:${.35 + i * .22}s"><div class="meter"></div><div class="k">${i + 1}</div><div class="tx${o.length > 16 ? ' long' : ''}">${esc(o)}</div><div class="pct"></div></div>`).join('');
     q.options.forEach((_, i) => setTimeout(() => audio.sfx('tick'), 350 + i * 220));
     $('jarCoins').innerHTML = ''; jarCount = 0;
     $('jarTotal').textContent = S.players.length;
@@ -344,7 +396,7 @@ setInterval(tick, 100);
 function renderReveal() {
   const st = S, q = st.question;
   if (!$('s-quiz').classList.contains('on')) renderQuestion(true);
-  show('quiz'); audio.play(gameTrack()); audio.duck(3200); audio.sfx('drumroll');
+  show('quiz'); audio.play(gameTrack()); audio.duck(3000); audio.sfx('countdown');
   $('timer').classList.add('hidden'); document.querySelector('.press-hint').classList.add('hidden');
   const total = st.counts.reduce((a, b) => a + b, 0);
   setTimeout(() => {
@@ -380,29 +432,62 @@ function renderReveal() {
       $('bonusNames').className = 'bonus-names glass';
       if (names.length) setTimeout(() => { fx.confetti(140); audio.sfx('applause'); }, 1500);
     }
+    setTimeout(() => $('jar').classList.add('hidden'), 1600);
+    if (st.round) showRoundCards(st.round, 3200);
   }, 2400);
 }
 
+function showRoundCards(rs, delay) {
+  const box = $('sideCards');
+  box.innerHTML = `<div class="side-card smart"><img src="themes/base/badge-smart.webp" alt=""><div><h4>${t('roundSmart')}</h4><b>${esc(rs.smart.name)}</b><span>${t('correctOf', { n: rs.smart.correct })}</span></div></div>
+    <div class="side-card fast"><img src="themes/base/badge-fast.webp" alt=""><div><h4>${t('roundFast')}</h4><b>${esc(rs.fast.name)}</b><span>${t('avgSec', { s: rs.fast.avg })}</span></div></div>`;
+  box.className = '';
+  setTimeout(() => { box.className = 'in'; audio.sfx('bonus'); }, delay);
+  setTimeout(() => { box.className = 'out'; }, delay + 5200);
+}
+
 function renderBoard() {
-  show('board'); audio.play('final'); audio.sfx('applause'); flash(); push();
-  const r = S.ranking.slice(0, 5), prev = S.prevRanking.map(p => p.name), H = 120;
-  const trophy = ['trophy-gold', 'trophy-silver', 'trophy-bronze'];
+  $('sideCards').className = 'out';
+  show('board'); audio.play('final'); flash(); push();
+  setTimeout(() => audio.say('announce-leaders', t('leaders')), 500);
+  const r = S.ranking.slice(0, 5), H = 124, trophy = ['trophy-gold', 'trophy-silver', 'trophy-bronze'];
+  const prev = (S.prevRanking || []).map(p => p.name), first = S.qIndex + 1 <= S.roundSize;
+  const prevScore = n => (S.prevRanking.find(x => x.name === n) || {}).score || 0;
   $('boardRows').innerHTML = r.map((p, i) => {
     let from = prev.indexOf(p.name); if (from < 0 || from > 5) from = 5;
-    return `<div class="brow r${i + 1}" style="top:${i * H}px;transform:translateY(${(from - i) * H}px)">
-      <span class="rk">${i + 1}</span>${i < 3 ? `<img src="themes/base/${trophy[i]}.webp" alt="">` : ''}
-      <span class="nm">${esc(p.name)}</span><span class="sc" data-to="${p.score}" data-from="${S.prevRanking.find(x => x.name === p.name)?.score || 0}">0</span></div>`;
+    return `<div class="brow ${first ? 'r' + (i + 1) : (from < 3 ? 'r' + (from + 1) : '')}" data-from="${from}" data-i="${i}" style="top:${i * H}px">
+      <span class="rk">${first ? i + 1 : from + 1}</span>${i < 3 ? `<img src="themes/base/${trophy[i]}.webp" alt="">` : ''}
+      <span class="nm">${esc(p.name)}</span>${i === 0 ? '<img class="crown" src="themes/base/crown.webp" alt="" onerror="this.outerHTML=\'<span class=crown>👑</span>\'">' : ''}
+      <span class="up">▲</span><span class="sc" data-from="${first ? 0 : prevScore(p.name)}" data-to="${p.score}">${first ? 0 : prevScore(p.name)}</span></div>`;
   }).join('');
-  setTimeout(() => { document.querySelectorAll('.brow').forEach(b => b.style.transform = 'translateY(0)'); audio.sfx('whoosh'); }, 900);
-  document.querySelectorAll('.brow .sc').forEach(el => countUp(el, +el.dataset.from, +el.dataset.to, 1600, 900));
-  const rs = S.round;
-  ['cardSmart', 'cardFast'].forEach(id => { $(id).classList.remove('in'); $(id).style.opacity = 0; });
-  if (rs) {
-    $('cardSmart').innerHTML = `<img src="themes/base/badge-smart.webp" alt=""><h4>${t('roundSmart')}</h4><div class="who">${esc(rs.smart.name)}</div><div class="info">${t('correctOf', { n: rs.smart.correct })}</div>`;
-    $('cardFast').innerHTML = `<img src="themes/base/badge-fast.webp" alt=""><h4>${t('roundFast')}</h4><div class="who">${esc(rs.fast.name)}</div><div class="info">${t('avgSec', { s: rs.fast.avg })}</div>`;
-    setTimeout(() => { $('cardSmart').classList.add('in'); audio.sfx('bonus'); }, 2600);
-    setTimeout(() => { $('cardFast').classList.add('in'); audio.sfx('bonus'); fx.confetti(); }, 3600);
+  const rows = [...document.querySelectorAll('.brow')];
+  if (first) {   // first time: reveal from 5th place up to 1st
+    rows.slice().reverse().forEach((el, k) => setTimeout(() => {
+      el.classList.add('show'); spot(el); countUp(el.querySelector('.sc'), 0, +el.querySelector('.sc').dataset.to, 700, 0);
+      audio.sfx(k === rows.length - 1 ? 'reveal' : 'whoosh');
+      if (k === rows.length - 1) { el.classList.add('crowned'); fx.confetti(220); fx.show(4, 400); audio.sfx('applause'); }
+    }, 1800 + k * 900));
+    return;
   }
+  // later rounds: show the old order, then everyone slides to the new place
+  rows.forEach(el => { el.style.transform = `translateY(${(+el.dataset.from - +el.dataset.i) * H}px)`; el.classList.add('show', 'still'); });
+  setTimeout(() => {
+    rows.forEach(el => {
+      el.classList.remove('still', 'r1', 'r2', 'r3'); el.style.transform = '';
+      if (+el.dataset.i < 3) el.classList.add('r' + (+el.dataset.i + 1));
+      el.querySelector('.rk').textContent = +el.dataset.i + 1;
+      if (+el.dataset.from > +el.dataset.i) el.classList.add('moved');
+      countUp(el.querySelector('.sc'), +el.querySelector('.sc').dataset.from, +el.querySelector('.sc').dataset.to, 1400, 0);
+    });
+    audio.sfx('whoosh');
+    if (rows.some(el => +el.dataset.from > +el.dataset.i)) setTimeout(() => audio.sfx('bonus'), 500);
+  }, 2600);
+  setTimeout(() => { rows[0].classList.add('crowned'); spot(rows[0]); fx.confetti(220); fx.show(4, 400); audio.sfx('applause'); }, 4300);
+}
+function spot(el) {   // a spotlight drops onto the row as it appears
+  const sp = document.createElement('div'); sp.className = 'row-spot';
+  sp.style.top = (el.offsetTop - 600) + 'px'; el.parentNode.appendChild(sp);
+  setTimeout(() => sp.remove(), 1400);
 }
 function countUp(el, from, to, dur, delay) {
   setTimeout(() => { const t0 = performance.now();
@@ -411,7 +496,10 @@ function countUp(el, from, to, dur, delay) {
 }
 
 function renderFinal() {
-  show('final'); audio.play(''); audio.sfx('drumroll');
+  $('sideCards').className = 'out';
+  show('final'); audio.play('final'); fx.lights(true); flash();
+  setTimeout(() => audio.say('announce-winners', t('winners')), 600);
+  clearInterval(renderFinal.t); renderFinal.t = setInterval(() => { if (S && S.status === 'finished') { fx.show(2, 500); fx.confetti(40); } else clearInterval(renderFinal.t); }, 4000);
   const r = S.ranking, tr = { 1: 'trophy-gold', 2: 'trophy-silver', 3: 'trophy-bronze' };
   [1, 2, 3].forEach(n => {
     const p = r[n - 1], el = $('pod' + n); el.classList.remove('in');
@@ -420,15 +508,15 @@ function renderFinal() {
   $('finalRest').innerHTML = r.slice(3, 12).map((p, i) => `<div><span>${i + 4}. ${esc(p.name)}</span><span>${p.score}</span></div>`).join('');
   $('finalRest').className = 'final-rest' + (r.length > 3 ? ' glass' : '');
   $('finalRest').style.padding = r.length > 3 ? '16px' : '0';
-  const steps = [[3, 1800], [2, 3600], [1, 5600]];
+  const steps = [[3, 1500], [2, 2900], [1, 4500]];
   steps.forEach(([n, at]) => setTimeout(() => {
     if (!r[n - 1]) return;
     $('pod' + n).classList.add('in'); flash();
-    if (n === 1) { audio.play('final'); audio.sfx('applause'); fx.show(10, 380); fx.confetti(300); } else audio.sfx('reveal');
+    if (n === 1) { audio.sfx('applause'); fx.show(10, 380); fx.confetti(300); } else audio.sfx('reveal');
   }, at));
-  $('finalFoot').innerHTML = S.kind !== 'real'
+  $('finalFoot').innerHTML = S.kind === 'demo'
     ? `${esc(t('demoDone'))}<br><button class="btn gold" id="againBtn">${esc(t('demoAgain'))}</button>`
-    : esc(t('finalSub'));
+    : esc(t('finalSub')) + (S.kind === 'preview' ? `<br><button class="btn gold" id="againBtn">${esc(t('demoAgain'))}</button>` : '');
   const ab = $('againBtn'); if (ab) ab.onclick = () => act('again');
 }
 
