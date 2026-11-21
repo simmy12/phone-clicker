@@ -173,7 +173,7 @@ function setPhase(g, phase, len) {
 function startQuestion(g, i) {
   g.qIndex = i;
   const q = questionsOf(g)[i];
-  setPhase(g, 'intro', q.bonus ? T.introBonus : T.intro);
+  setPhase(g, 'intro', (q.bonus ? T.introBonus : T.intro) + (i === 0 ? 3600 : 0));   // first question: 3-2-1 countdown
 }
 
 function advance(g) {
@@ -218,7 +218,7 @@ function recordAnswer(g, p, digit) {
   const pts = digit === q.correct ? Math.round((500 + 500 * Math.max(0, 1 - ms / limit)) * (q.bonus ? 2 : 1)) : 0;
   p.answers[g.qIndex] = { digit, ms: Math.max(0, ms), points: pts };
   g.updatedAt = Date.now(); save(g);
-  if (allAnswered(g) && !g.paused) advance(g);
+  if (g.mode === 'manual' && allAnswered(g) && !g.paused) advance(g);   // with a timer, the timer always runs to the end
 }
 function simAnswers(g) {
   const qi = g.qIndex, q = questionsOf(g)[qi];
@@ -397,7 +397,7 @@ app.get('/api/game', withGame, (req, res) => {
     bonusRight: reveal && q.bonus ? g.players.filter(p => p.answers[g.qIndex]?.digit === q.correct).map(p => p.name) : null,
     ranking: g.phase === 'board' || g.status === 'finished' ? ranking(g) : null,
     prevRanking: g.phase === 'board' ? ranking(g, Math.floor(g.qIndex / roundSize(g)) * roundSize(g)) : null,
-    round: g.phase === 'board' ? roundStats(g) : null,
+    round: reveal && roundSize(g) < 100 && g.qIndex % roundSize(g) === 2 ? roundStats(g) : null,   // once per round, beside a question
   });
 });
 
