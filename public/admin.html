@@ -31,6 +31,11 @@
     <input id="key" type="password">
   </div>
   <div class="card">
+    <h2>👀 לראות איך המשחק נראה</h2>
+    <div class="hint">משחק לדוגמה עם 6 שחקנים מדומים שמתחברים ועונים לבד, בלי טלפונים. לא עולה כלום.</div>
+    <button onclick="preview()">פתח משחק לדוגמה</button>
+  </div>
+  <div class="card">
     <h2>משחק חדש ללקוח</h2>
     <div class="grid">
       <div><label>שם (יופיע על המסך)</label><input id="title" placeholder="לדוגמה: הטריוויה של משפחת כהן"></div>
@@ -78,6 +83,12 @@ ${r.real}
 
 איך משחקים: פותחים את הקישור במחשב שמחובר למסך, רושמים שמות ומספרי טלפון, כולם מתקשרים למספר שעל המסך ומחכים לצפצוף, ועונים בלחיצה על מספר התשובה. בהצלחה!`;
   load();
+}
+async function preview() {
+  localStorage.setItem('adminKey', $('key').value);
+  const w = window.open('', '_blank');
+  const r = await post('/api/admin/preview', {});
+  if (r.link) w.location = r.link; else { w.close(); $('err').textContent = r.error || ''; }
 }
 function copy(id, btn) { navigator.clipboard.writeText($(id).textContent); const t = btn.textContent; btn.textContent = 'הועתק ✓'; setTimeout(() => btn.textContent = t, 1500); }
 function open1(id) { window.open($(id).textContent); }

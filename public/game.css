@@ -463,3 +463,17 @@ input, select { font-family:"Rubik"; font-weight:600; border:2px solid rgba(255,
 .bonus-names h3 { font-family:"Rubik"; font-weight:900; color:#ffe9a8; }
 .bonus-names .nm { font-weight:800; color:#fff; }
 .paused-box .logo-sm { font-size:52px; }
+
+/* toolbar with modern icons */
+#toolbar { gap:8px; padding:8px 10px; border-radius:22px; background:rgba(14,10,48,.78); border:1px solid rgba(255,255,255,.18); backdrop-filter:blur(10px); box-shadow:0 10px 30px rgba(0,0,0,.4); }
+#toolbar button { width:52px; height:52px; border-radius:16px; display:grid; place-items:center; background:rgba(255,255,255,.08); color:#fff; transition:background .2s, transform .1s; }
+#toolbar button:hover { background:rgba(124,58,237,.65); } #toolbar button:active { transform:scale(.94); }
+#toolbar svg { width:26px; height:26px; }
+#tbSound.muted { opacity:.45; } #tbSound.muted::after { content:""; position:absolute; width:30px; height:3px; background:#fff; rotate:45deg; border-radius:2px; }
+#tbSound { position:relative; }
+#tbPause.paused { background:#22c55e; }
+#tbInfo { font-weight:700; color:#cfd6ff; }
+#soundPrompt { position:absolute; z-index:60; bottom:150px; left:50%; translate:-50% 0; display:flex; align-items:center; gap:14px; cursor:pointer;
+  font-family:"Rubik"; font-weight:800; font-size:30px; color:#fff; padding:14px 34px; border-radius:50px; border:2px solid rgba(255,255,255,.7);
+  background:linear-gradient(180deg,#9d6bff,#6d28d9); box-shadow:0 8px 0 #3b0f7a, 0 0 30px rgba(168,85,247,.7); animation:goPulse 1.6s ease-in-out infinite; }
+#soundPrompt svg { width:34px; height:34px; }

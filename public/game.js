@@ -29,10 +29,16 @@ function showErr(r) {
 
 // ---------- audio: real files if present, otherwise generated sounds ----------
 const audio = (() => {
-  let ac = null, on = true, music = null, musicName = '', synthLoop = null;
+  let ac = null, on = true, music = null, musicName = '', synthLoop = null, unlocked = false;
   const files = {}, missing = new Set();
   const theme = () => (S && S.theme.id) || 'hanukkah';
-  function unlock() { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); }
+  function unlock() {
+    if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+    if (ac.state === 'suspended') ac.resume();
+    unlocked = true; document.getElementById('soundPrompt').classList.add('hidden');
+    if (music && music.paused && on) music.play().catch(() => {});   // music that the browser blocked before the first click
+    else if (!music && musicName && on) { const n = musicName; musicName = ''; play(n); }
+  }
   function file(name) {
     if (missing.has(name)) return null;
     if (!files[name]) {
@@ -101,7 +107,7 @@ const audio = (() => {
     if (musicName === name) return;
     stop(); musicName = name; if (!name || !on) return;
     const a = file(name);
-    if (a) { music = a; a.loop = true; a.volume = VOL[name] || .5; a.currentTime = 0; a.play().catch(() => { if (missing.has(name)) synthMusic(SYN_OF[name] || name); }); setTimeout(() => { if (musicName === name && missing.has(name)) synthMusic(SYN_OF[name] || name); }, 2500); }
+    if (a) { music = a; a.loop = true; a.volume = VOL[name] || .5; a.currentTime = 0; a.play().catch(() => { if (missing.has(name)) synthMusic(SYN_OF[name] || name); else if (!unlocked) document.getElementById('soundPrompt').classList.remove('hidden'); }); setTimeout(() => { if (musicName === name && missing.has(name)) synthMusic(SYN_OF[name] || name); }, 2500); }
     else synthMusic(SYN_OF[name] || name);
   }
   function stop() { if (music) { music.pause(); music = null; } clearInterval(synthLoop); synthLoop = null; musicName = ''; }
@@ -109,6 +115,7 @@ const audio = (() => {
   return { unlock, sfx, play, stop, toggle, duck, preload: names => names.forEach(file), get on() { return on; } };
 })();
 document.addEventListener('pointerdown', () => audio.unlock());
+$('soundPrompt').onclick = () => audio.unlock();
 
 // ---------- particles: gold dust, confetti, fireworks ----------
 const fx = (() => {
@@ -218,7 +225,7 @@ function doAct(a) {
   if (a === 'next') act('next');
   if (a === 'pause') act(S.paused ? 'resume' : 'pause');
   if (a === 'full') { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); else document.exitFullscreen(); }
-  if (a === 'sound') $('tbSound').textContent = audio.toggle() ? '🔊' : '🔇';
+  if (a === 'sound') $('tbSound').classList.toggle('muted', !audio.toggle());
   if (a === 'end' && confirm(t('confirmEnd'))) act('end');
 }
 $('toolbar').onclick = e => { const b = e.target.closest('button'); if (b) doAct(b.dataset.act); };
@@ -244,7 +251,7 @@ function render() {
   const s = S, key = [s.status, s.phase, s.qIndex].join('|'), changed = key !== prevKey;
   $('toolbar').classList.toggle('hidden', !['lobby', 'play'].includes(s.status));
   $('tbInfo').textContent = s.status === 'play' ? t('questionOf', { n: s.qIndex + 1, total: s.total }) : '';
-  $('tbPause').textContent = s.paused ? '▶' : '⏸';
+  $('tbPause').classList.toggle('paused', !!s.paused);
   $('pausedOverlay').classList.toggle('hidden', !s.paused);
   $('pausedTitle').textContent = s.resumed ? t('resumeGame') : t('paused');
   setBg(s.phase === 'board' || s.status === 'finished');
@@ -262,7 +269,7 @@ function render() {
 }
 
 function renderLobby(changed) {
-  if (changed) { show('lobby'); audio.play('lobby'); health(); }
+  if (changed) { show('lobby'); audio.play('lobby'); health(); $('editBtn').classList.toggle('hidden', s().kind === 'preview'); }
   $('logo').textContent = s().title || s().theme.title;
   $('subRibbon').textContent = s().kind === 'demo' ? t('demoBadge') : s().theme.subtitle;
   $('phoneNum').textContent = s().phone;
@@ -419,7 +426,7 @@ function renderFinal() {
     $('pod' + n).classList.add('in'); flash();
     if (n === 1) { audio.play('final'); audio.sfx('applause'); fx.show(10, 380); fx.confetti(300); } else audio.sfx('reveal');
   }, at));
-  $('finalFoot').innerHTML = S.kind === 'demo'
+  $('finalFoot').innerHTML = S.kind !== 'real'
     ? `${esc(t('demoDone'))}<br><button class="btn gold" id="againBtn">${esc(t('demoAgain'))}</button>`
     : esc(t('finalSub'));
   const ab = $('againBtn'); if (ab) ab.onclick = () => act('again');

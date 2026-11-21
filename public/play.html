@@ -21,12 +21,13 @@
     <!-- host toolbar -->
     <div id="toolbar" class="hidden">
       <span id="tbInfo"></span>
-      <button data-act="next" title="הבא (רווח)">⏭</button>
-      <button data-act="pause" id="tbPause" title="השהיה (P)">⏸</button>
-      <button data-act="full" title="מסך מלא (F)">⛶</button>
-      <button data-act="sound" id="tbSound" title="צלילים (M)">🔊</button>
-      <button data-act="end" title="סיום">⏹</button>
+      <button data-act="next" title="הבא (רווח)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4" fill="currentColor"/><line x1="19" y1="5" x2="19" y2="19"/></svg></button>
+      <button data-act="pause" id="tbPause" title="השהיה (P)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg></button>
+      <button data-act="full" title="מסך מלא (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+      <button data-act="sound" id="tbSound" title="צלילים (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg></button>
+      <button data-act="end" title="סיום"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg></button>
     </div>
+    <button id="soundPrompt" class="hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg><span data-t="soundOn"></span></button>
 
     <!-- setup -->
     <section id="s-setup" class="screen">
@@ -48,7 +49,6 @@
 
     <!-- lobby -->
     <section id="s-lobby" class="screen">
-      <div class="beam b1"></div><div class="beam b2"></div>
       <div class="lobby-title" id="logo"></div>
       <div class="lobby-sub" id="subRibbon"></div>
       <div class="holo-wrap"><div class="holo">
