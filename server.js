@@ -118,7 +118,7 @@ function newGame(info) {
 function baseGame(info) {
   return {
     id: info.id, kind: info.k || 'real', theme: info.th || 'hanukkah', title: info.title || '', lang: info.lg === 'en' ? 'en' : 'he',
-    max: info.k === 'demo' ? DEMO_MAX : info.max, status: 'setup', phase: null, qIndex: -1,
+    max: info.k === 'demo' ? Math.min(DEMO_MAX, info.max || DEMO_MAX) : info.max, status: 'setup', phase: null, qIndex: -1,
     phaseEnd: 0, phaseLen: 0, paused: false, pausedLeft: 0, mode: 'auto', seconds: 20,
     players: [], used: false, startedAt: 0, finishedAt: 0, updatedAt: Date.now(), timer: null, limitTimer: null,
   };
@@ -511,9 +511,10 @@ app.post('/api/admin/create', adminOnly, (req, res) => {
   const id = crypto.randomBytes(5).toString('hex');
   const days = Math.min(365, Math.max(1, parseInt(req.body.days, 10) || 30));
   const base = { title: String(req.body.title || '').slice(0, 60), th: theme, lg: req.body.lang === 'en' ? 'en' : 'he', exp: Date.now() + days * 86400000 };
-  const real = makeToken({ ...base, id, k: 'real', max: Math.min(100, Math.max(1, parseInt(req.body.maxPlayers, 10) || 8)) });
-  const demo = makeToken({ ...base, id: id + '-demo', k: 'demo', max: DEMO_MAX });
-  store.set(id, snapshot(newGame({ id, k: 'real', th: theme, lg: base.lg, title: base.title, max: parseInt(req.body.maxPlayers, 10) || 8 }))).catch(() => {});
+  const max = Math.min(100, Math.max(1, parseInt(req.body.maxPlayers, 10) || 8));
+  const real = makeToken({ ...base, id, k: 'real', max });
+  const demo = makeToken({ ...base, id: id + '-demo', k: 'demo', max: Math.min(DEMO_MAX, max) });
+  store.set(id, snapshot(newGame({ id, k: 'real', th: theme, lg: base.lg, title: base.title, max }))).catch(() => {});
   res.json({ real: `${baseOf(req)}/play.html?t=${real}`, demo: `${baseOf(req)}/play.html?t=${demo}` });
 });
 
