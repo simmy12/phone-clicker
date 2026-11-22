@@ -36,7 +36,12 @@ function loadTheme(id) {
   const dir = path.join(PUBLIC, 'themes', id);
   if (!/^[a-z0-9-]+$/.test(id) || !fs.existsSync(dir)) return null;
   const read = f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-  themes[id] = { id, ...read('theme.json'), questions: read('questions.json'), demo: read('demo.json') };
+  const opt = f => fs.existsSync(path.join(dir, f)) ? read(f) : null;
+  const th = read('theme.json');
+  themes[id] = { id, ...th,
+    lang: { he: { questions: read('questions.json'), demo: read('demo.json'), title: th.title, subtitle: th.subtitle },
+            en: { questions: opt('questions.en.json') || read('questions.json'), demo: opt('demo.en.json') || read('demo.json'),
+                  title: th.titleEn || th.title, subtitle: th.subtitleEn || th.subtitle } } };
   return themes[id];
 }
 
@@ -100,7 +105,8 @@ const SIM_NAMES = ['שרה', 'מנחם', 'חיה', 'יוסי', 'רבקה', 'דו
 function newGame(info) {
   if (info.k === 'preview') {
     const g = { ...baseGame(info), status: 'lobby', mode: 'auto', seconds: 15 };
-    g.players = SIM_NAMES.slice(0, 6).map((name, i) => ({ name, phone: '+1000000000' + i, sim: true, skill: .45 + i * .08,
+    const names = info.lg === 'en' ? ['Sarah', 'Menachem', 'Chaya', 'Yossi', 'Rivka', 'Dovid'] : SIM_NAMES;
+    g.players = names.slice(0, 6).map((name, i) => ({ name, phone: '+1000000000' + i, sim: true, skill: .45 + i * .08,
       connected: false, lastSeen: 0, callSid: '', answers: {} }));
     g.players.forEach((p, i) => setTimeout(() => { p.connected = true; p.lastSeen = Date.now(); setTimeout(() => { p.tested = true; }, 1800); }, 1500 + i * 1300));
     return g;
@@ -109,7 +115,7 @@ function newGame(info) {
 }
 function baseGame(info) {
   return {
-    id: info.id, kind: info.k || 'real', theme: info.th || 'hanukkah', title: info.title || '',
+    id: info.id, kind: info.k || 'real', theme: info.th || 'hanukkah', title: info.title || '', lang: info.lg === 'en' ? 'en' : 'he',
     max: info.k === 'demo' ? DEMO_MAX : info.max, status: 'setup', phase: null, qIndex: -1,
     phaseEnd: 0, phaseLen: 0, paused: false, pausedLeft: 0, mode: 'auto', seconds: 20,
     players: [], used: false, startedAt: 0, finishedAt: 0, updatedAt: Date.now(), timer: null, limitTimer: null,
@@ -141,7 +147,8 @@ async function getGame(info) {
   return g;
 }
 
-const questionsOf = g => { const th = loadTheme(g.theme); return g.kind === 'demo' ? th.demo : th.questions; };
+const langOf = g => (g.lang === 'en' ? 'en' : 'he');
+const questionsOf = g => { const L = loadTheme(g.theme).lang[langOf(g)]; return g.kind === 'demo' ? L.demo : L.questions; };
 const roundSize = g => g.kind === 'demo' ? 999 : (loadTheme(g.theme).roundSize || 5);
 const isConnected = p => p.connected && (p.sim || Date.now() - p.lastSeen < STALE_MS);
 const isLive = g => g.status === 'lobby' || g.status === 'play';
@@ -404,7 +411,7 @@ app.get('/api/game', withGame, (req, res) => {
     kind: g.kind, title: g.title, max: g.max, status: g.status, phase: g.phase, paused: g.paused, resumed: !!g.resumed,
     mode: g.mode, seconds: g.seconds, phone: PHONE_NUMBER, total: qs.length, qIndex: g.qIndex, roundSize: roundSize(g),
     remainingMs: left, phaseLen: g.phaseLen, used: g.used,
-    theme: { id: th.id, title: th.title, subtitle: th.subtitle, decor: th.decor, bonusImage: th.bonusImage },
+    lang: langOf(g), theme: { id: th.id, title: th.lang[langOf(g)].title, subtitle: th.lang[langOf(g)].subtitle, decor: th.decor, bonusImage: th.bonusImage },
     question: showQ || (g.status === 'play' && g.phase === 'intro') ? {
       text: g.phase === 'memory' || g.phase === 'intro' ? null : q.text,
       options: g.phase === 'memory' || g.phase === 'intro' ? null : q.options,
@@ -430,6 +437,11 @@ app.post('/api/game/players', withGame, (req, res) => {
   if (!list.length) return res.status(400).json({ error: 'noPlayers' });
   if (list.length > g.max) return res.status(400).json({ error: 'tooMany', max: g.max });
   if (new Set(list.map(p => p.phone)).size !== list.length) return res.status(400).json({ error: 'samePhone' });
+  for (const other of games.values()) {
+    if (other.id === g.id || !isLive(other) || other.kind === 'preview' || other.kind === 'load') continue;
+    const clash = list.find(p => other.players.some(o => o.phone === p.phone));
+    if (clash) return res.status(400).json({ error: 'phoneBusy', name: clash.name });
+  }
   const old = new Map(g.players.map(p => [p.phone, p]));
   g.players = list.map(p => ({ ...p, connected: old.get(p.phone)?.connected || false, lastSeen: old.get(p.phone)?.lastSeen || 0, callSid: '', answers: {} }));
   g.mode = req.body.mode === 'manual' ? 'manual' : 'auto';
@@ -457,6 +469,8 @@ app.post('/api/game/start', withGame, (req, res) => {
 
 app.post('/api/game/next', withGame, (req, res) => {
   const g = req.game;
+  if (Date.now() - (g.lastNext || 0) < 1500) return res.json({ ok: true, ignored: true });   // two screens / double click
+  g.lastNext = Date.now();
   if (g.status === 'play') { if (g.paused) resume(g); else advance(g); }
   res.json({ ok: true });
 });
@@ -494,16 +508,23 @@ app.post('/api/admin/create', adminOnly, (req, res) => {
   const theme = loadTheme(req.body.theme || 'hanukkah') ? (req.body.theme || 'hanukkah') : 'hanukkah';
   const id = crypto.randomBytes(5).toString('hex');
   const days = Math.min(365, Math.max(1, parseInt(req.body.days, 10) || 30));
-  const base = { title: String(req.body.title || '').slice(0, 60), th: theme, exp: Date.now() + days * 86400000 };
+  const base = { title: String(req.body.title || '').slice(0, 60), th: theme, lg: req.body.lang === 'en' ? 'en' : 'he', exp: Date.now() + days * 86400000 };
   const real = makeToken({ ...base, id, k: 'real', max: Math.min(100, Math.max(1, parseInt(req.body.maxPlayers, 10) || 8)) });
   const demo = makeToken({ ...base, id: id + '-demo', k: 'demo', max: DEMO_MAX });
-  store.set(id, snapshot(newGame({ id, k: 'real', th: theme, title: base.title, max: parseInt(req.body.maxPlayers, 10) || 8 }))).catch(() => {});
+  store.set(id, snapshot(newGame({ id, k: 'real', th: theme, lg: base.lg, title: base.title, max: parseInt(req.body.maxPlayers, 10) || 8 }))).catch(() => {});
   res.json({ real: `${baseOf(req)}/play.html?t=${real}`, demo: `${baseOf(req)}/play.html?t=${demo}` });
 });
 
 app.post('/api/admin/preview', adminOnly, (req, res) => {   // a sample game with fake players, to see how it looks
-  const t = makeToken({ id: 'preview-' + crypto.randomBytes(4).toString('hex'), k: 'preview', th: 'hanukkah', title: 'משחק לדוגמה', max: 8, exp: Date.now() + 86400000 });
+  const en = req.body.lang === 'en';
+  const t = makeToken({ id: 'preview-' + crypto.randomBytes(4).toString('hex'), k: 'preview', th: 'hanukkah', lg: en ? 'en' : 'he', title: en ? 'Sample Game' : 'משחק לדוגמה', max: 8, exp: Date.now() + 86400000 });
   res.json({ link: `${baseOf(req)}/play.html?t=${t}` });
+});
+
+app.post('/api/admin/balance', adminOnly, async (req, res) => {
+  if (!client) return res.json({ balance: null });
+  try { const b = await client.balance.fetch(); res.json({ balance: +b.balance, currency: b.currency }); }
+  catch (e) { res.json({ balance: null, error: e.message }); }
 });
 
 app.post('/api/admin/games', adminOnly, async (req, res) => {
