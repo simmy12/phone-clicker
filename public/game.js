@@ -338,6 +338,18 @@ function renderLobby(changed) {
   if ($('lobbyChips').dataset.h !== html) { $('lobbyChips').innerHTML = html; $('lobbyChips').dataset.h = html; }
 }
 const s = () => S;
+function fitQuestion() {   // long questions / answers shrink until they fit their box, never cut
+  const run = () => {
+    const q = $('qText'); let s = 64; q.style.fontSize = s + 'px';
+    while (q.offsetHeight > 200 && s > 34) { s -= 2; q.style.fontSize = s + 'px'; }
+    document.querySelectorAll('#tiles .tx').forEach(el => {
+      let f = el.classList.contains('long') ? 38 : 46; el.style.fontSize = f + 'px';
+      while ((el.scrollHeight > 112 || el.scrollWidth > el.clientWidth + 1) && f > 22) { f -= 2; el.style.fontSize = f + 'px'; }
+    });
+  };
+  run(); requestAnimationFrame(run); if (document.fonts) document.fonts.ready.then(run);
+}
+window.fitQuestion = fitQuestion;
 function fitText(el, maxW, maxSize) {   // shrink the text until it fits (fonts differ between computers)
   let size = maxSize; el.style.fontSize = size + 'px';
   while (el.scrollWidth > maxW && size > 40) { size -= 4; el.style.fontSize = size + 'px'; }
@@ -390,6 +402,7 @@ function renderQuestion(changed) {
     $('qText').textContent = q.text;
     $('tiles').classList.remove('reveal');
     $('tiles').innerHTML = q.options.map((o, i) => `<div class="tile t${i + 1} flip" style="animation-delay:${.35 + i * .22}s"><div class="meter"></div><div class="k">${i + 1}</div><div class="tx${o.length > 16 ? ' long' : ''}">${esc(o)}</div><div class="pct"></div></div>`).join('');
+    fitQuestion();
     q.options.forEach((_, i) => setTimeout(() => audio.sfx('tick'), 350 + i * 220));
     $('jarCoins').innerHTML = ''; jarCount = 0;
     $('jarTotal').textContent = S.players.length;
@@ -449,6 +462,7 @@ function renderReveal() {
         el.querySelector('.meter').style.width = p + '%';
         el.querySelector('.pct').textContent = t('pct', { p });
       });
+      fitQuestion();
     }, 500 + n * 70);
     if (q.bonus) {
       const names = st.bonusRight || [];

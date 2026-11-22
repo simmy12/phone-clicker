@@ -556,3 +556,6 @@ input, select { font-family:"Rubik"; font-weight:600; border:2px solid rgba(255,
 .holo { overflow:visible; } .holo::after { display:none; }
 .board-title, .mem-title { white-space:nowrap; }
 #s-intro .intro-txt { display:inline-block; }
+
+/* v8: answers never cut */
+.tile .tx { overflow-wrap:anywhere; max-height:132px; }

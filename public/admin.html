@@ -70,6 +70,10 @@
     </div>
   </div>
   <div class="card">
+    <h2>🛒 הזמנות מהאתר</h2>
+    <table><thead><tr><th>מתי</th><th>שם</th><th>טלפון</th><th>חבילה</th><th>ערב</th><th>שפה</th><th>עיר / הערות</th></tr></thead><tbody id="orders"></tbody></table>
+  </div>
+  <div class="card">
     <h2>משחקים</h2>
     <table><thead><tr><th>שם</th><th>שחקנים</th><th>מצב</th><th>התחיל</th></tr></thead><tbody id="games"></tbody></table>
   </div>
@@ -141,6 +145,12 @@ async function load() {
   $('games').innerHTML = r.map(g => { const [c, n] = stName(g);
     return `<tr><td>${esc(g.title || '—')}</td><td>${g.connected}/${g.players || 0} (עד ${g.max})</td><td><span class="st ${c}">${n}</span></td><td>${g.startedAt ? new Date(g.startedAt).toLocaleString('he-IL') : ''}</td></tr>`; }).join('') || '<tr><td colspan="4">אין עדיין</td></tr>';
 }
+async function orders() {
+  if (!$('key').value) return;
+  const r = await post('/api/admin/orders', {});
+  if (!Array.isArray(r)) return;
+  $('orders').innerHTML = r.map(o => `<tr><td>${new Date(o.createdAt).toLocaleString('he-IL')}</td><td>${esc(o.name)}</td><td><a href="sms:${esc(o.phone)}">${esc(o.phone)}</a></td><td>${esc(o.pkg)}</td><td>${esc(o.night)}</td><td>${o.lang === 'he' ? 'עברית' : 'אנגלית'}</td><td>${esc([o.code && ('קוד ' + o.code), o.city, o.email, o.notes].filter(Boolean).join(' · '))}</td></tr>`).join('') || '<tr><td colspan="7">אין עדיין</td></tr>';
+}
 async function balance() {
   if (!$('key').value) return;
   const r = await post('/api/admin/balance', {});
@@ -150,7 +160,7 @@ async function balance() {
   $('balance').style.background = low ? '#fee2e2' : '#ecfdf5';
   $('balance').textContent = `יתרה ב-Twilio: $${r.balance.toFixed(2)}` + (low ? ' · ⚠️ נמוכה! כדאי להטעין לפני המשחק הבא' : '');
 }
-load(); balance(); setInterval(load, 5000); setInterval(balance, 60000);
+load(); balance(); orders(); setInterval(load, 5000); setInterval(orders, 30000); setInterval(balance, 60000);
 </script>
 </body>
 </html>
