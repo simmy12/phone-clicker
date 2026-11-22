@@ -71,6 +71,7 @@ const store = (() => {
       async get(id) { await ready; const r = await pool.query('select data from games where id=$1', [id]); return r.rows[0] ? r.rows[0].data : null; },
       async set(id, data) { await ready; await pool.query('insert into games (id, data, updated_at) values ($1,$2,now()) on conflict (id) do update set data=$2, updated_at=now()', [id, data]); },
       async list() { await ready; const r = await pool.query('select data from games order by updated_at desc limit 300'); return r.rows.map(x => x.data); },
+      async orders() { await ready; const r = await pool.query("select data from games where data->>'kind'='order' order by updated_at desc limit 500"); return r.rows.map(x => x.data); },
     };
   }
   const file = path.join(__dirname, 'data', 'games.json');
@@ -83,6 +84,7 @@ const store = (() => {
     async get(id) { return db[id] || null; },
     async set(id, data) { db[id] = data; flush(); },
     async list() { return Object.values(db).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 300); },
+    async orders() { return Object.values(db).filter(o => o.kind === 'order'); },
   };
 })();
 
@@ -520,6 +522,40 @@ app.post('/api/admin/preview', adminOnly, (req, res) => {   // a sample game wit
   const t = makeToken({ id: 'preview-' + crypto.randomBytes(4).toString('hex'), k: 'preview', th: 'hanukkah', lg: en ? 'en' : 'he', title: en ? 'Sample Game' : 'משחק לדוגמה', max: 8, exp: Date.now() + 86400000 });
   res.json({ link: `${baseOf(req)}/play.html?t=${t}` });
 });
+
+// --- orders from the public order page (/order.html) ---
+const orderHits = new Map();
+app.post('/api/order', async (req, res) => {
+  const ip = String(req.headers['x-forwarded-for'] || req.ip).split(',')[0];
+  const now = Date.now(), last = orderHits.get(ip) || [];
+  const recent = last.filter(x => now - x < 3600000);
+  if (recent.length >= 5) return res.status(429).json({ error: 'Too many orders from this connection. Please text us instead.' });
+  const b = req.body || {}, clip = (v, n) => String(v || '').trim().slice(0, n);
+  const o = { id: 'order-' + crypto.randomBytes(5).toString('hex'), kind: 'order', name: clip(b.name, 80), phone: clip(b.phone, 30),
+    email: clip(b.email, 120), pkg: clip(b.pkg, 30), night: clip(b.night, 40), lang: b.lang === 'he' ? 'he' : 'en',
+    city: clip(b.city, 60), code: clip(b.code, 30).toUpperCase(), notes: clip(b.notes, 500), createdAt: now, updatedAt: now };
+  if (!o.name || o.phone.replace(/\D/g, '').length < 10) return res.status(400).json({ error: 'Please enter your name and a 10-digit phone number.' });
+  recent.push(now); orderHits.set(ip, recent);
+  await store.set(o.id, o);
+  console.log('NEW ORDER', o.pkg, o.night, mask(o.phone));
+  res.json({ ok: true });
+});
+app.post('/api/admin/orders', adminOnly, async (req, res) => {
+  const list = await store.orders();
+  res.json(list.sort((a, b) => b.createdAt - a.createdAt));
+});
+// --- public demo: a sample game with fake players, no phone calls, no cost ---
+const demoHits = new Map();
+app.get('/demo', (req, res) => {
+  const ip = String(req.headers['x-forwarded-for'] || req.ip).split(',')[0], now = Date.now();
+  const recent = (demoHits.get(ip) || []).filter(x => now - x < 3600000);
+  if (recent.length >= 10) return res.status(429).send('Please try again later.');
+  recent.push(now); demoHits.set(ip, recent);
+  const he = req.query.lang === 'he';
+  const t = makeToken({ id: 'preview-' + crypto.randomBytes(4).toString('hex'), k: 'preview', th: 'hanukkah', lg: he ? 'he' : 'en', title: he ? 'משחק לדוגמה' : 'Sample Game', max: 8, exp: now + 3 * 3600000 });
+  res.redirect(`/play.html?t=${t}`);
+});
+app.get('/order', (req, res) => res.sendFile(path.join(PUBLIC, 'order.html')));
 
 app.post('/api/admin/balance', adminOnly, async (req, res) => {
   if (!client) return res.json({ balance: null });
