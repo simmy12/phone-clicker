@@ -320,16 +320,28 @@ function renderLobby(changed) {
   if (changed) { show('lobby'); audio.play('lobby'); health(); $('editBtn').classList.toggle('hidden', s().kind === 'preview'); }
   $('logo').textContent = s().title || s().theme.title;
   $('subRibbon').textContent = s().kind === 'demo' ? t('demoBadge') : s().theme.subtitle;
-  $('phoneNum').textContent = s().phone;
+  if ($('phoneNum').textContent !== s().phone) { $('phoneNum').textContent = s().phone; }
+  fitText($('phoneNum'), 1020, 136);
   const on = s().players.filter(p => p.connected).length;
   const before = prevS && prevS.status === 'lobby' ? prevS.players.filter(p => p.connected).length : on;
   if (on > before) audio.sfx('join');
   $('lobbyOn').textContent = on; $('lobbyTotal').textContent = s().players.length;
   $('startBtn').disabled = on === 0;
-  const html = s().players.map(p => `<span class="pchip ${p.connected ? 'on' : ''}"><b>${p.connected ? '✓' : '…'}</b>${esc(p.name)}<small>${p.connected ? t('connected') : t('waiting')}</small></span>`).join('');
+  const html = s().players.map(p => {
+    const st = !p.connected ? 'waiting' : p.tested ? 'tested' : 'connected';
+    return `<span class="pchip ${p.connected ? 'on' : ''} ${p.tested ? 'tested' : ''}"><b>${p.connected ? '✓' : '…'}</b>${esc(p.name)}<small>${t(st)}</small></span>`;
+  }).join('');
+  const tested = s().players.filter(p => p.tested).length;
+  const prevTested = prevS && prevS.status === 'lobby' ? prevS.players.filter(p => p.tested).length : tested;
+  if (tested > prevTested) audio.sfx('coin');
+  $('testHint').classList.toggle('hidden', on === 0);
   if ($('lobbyChips').dataset.h !== html) { $('lobbyChips').innerHTML = html; $('lobbyChips').dataset.h = html; }
 }
 const s = () => S;
+function fitText(el, maxW, maxSize) {   // shrink the text until it fits (fonts differ between computers)
+  let size = maxSize; el.style.fontSize = size + 'px';
+  while (el.scrollWidth > maxW && size > 40) { size -= 4; el.style.fontSize = size + 'px'; }
+}
 
 function renderIntro() {
   const q = S.question, bonus = q && q.bonus;

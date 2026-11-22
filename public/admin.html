@@ -36,6 +36,19 @@
     <button onclick="preview()">פתח משחק לדוגמה</button>
   </div>
   <div class="card">
+    <h2>📞 בדיקת עומס בשיחות אמיתיות</h2>
+    <div class="hint">Twilio מחייג למספר המשחק שוב ושוב, ו"רובוטים" לוחצים על מקשים כמו שחקנים אמיתיים. דורש חשבון Twilio משודרג.
+      עלות משוערת: כ-2 סנט לדקה לכל שיחה (100 שיחות × 5 דקות ≈ 10$).</div>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div><label>כמה שיחות (עד 100)</label><input id="ltCount" type="number" value="10" min="1" max="100"></div>
+      <div><label>מחולקות לכמה משחקים</label><input id="ltGames" type="number" value="1" min="1" max="20"></div>
+    </div>
+    <button onclick="loadStart()">התחל בדיקת עומס</button>
+    <button onclick="loadStop()" style="background:#b91c1c">עצור ונתק את כל השיחות</button>
+    <div class="msg" id="ltStatus" style="display:none"></div>
+    <div id="ltLinks"></div>
+  </div>
+  <div class="card">
     <h2>משחק חדש ללקוח</h2>
     <div class="grid">
       <div><label>שם (יופיע על המסך)</label><input id="title" placeholder="לדוגמה: הטריוויה של משפחת כהן"></div>
@@ -89,6 +102,21 @@ async function preview() {
   const w = window.open('', '_blank');
   const r = await post('/api/admin/preview', {});
   if (r.link) w.location = r.link; else { w.close(); $('err').textContent = r.error || ''; }
+}
+async function loadStart() {
+  if (!confirm('להתחיל בדיקת עומס? זה מחייג שיחות אמיתיות ועולה כסף ב-Twilio.')) return;
+  const r = await post('/api/admin/loadtest', { count: $('ltCount').value, games: $('ltGames').value });
+  if (r.error) { alert(r.error); return; }
+  $('ltLinks').innerHTML = r.links.map((l, i) => `<div class="link"><b>משחק ${i + 1}:</b><code>${esc(l)}</code><button class="sm" onclick="window.open('${l}')">פתח</button></div>`).join('');
+  loadPoll();
+}
+async function loadStop() { await post('/api/admin/loadtest/stop', {}); loadPoll(); }
+async function loadPoll() {
+  const r = await post('/api/admin/loadtest/status', {});
+  if (!r.requested) return;
+  $('ltStatus').style.display = 'block';
+  $('ltStatus').textContent = `חויגו ${r.placed} מתוך ${r.requested} · מחוברים עכשיו: ${r.connected}` + (r.running ? ' · מחייג...' : '') + (r.errors ? `\nשגיאות: ${r.errors} (${r.lastError})` : '');
+  clearTimeout(loadPoll.t); loadPoll.t = setTimeout(loadPoll, 3000);
 }
 function copy(id, btn) { navigator.clipboard.writeText($(id).textContent); const t = btn.textContent; btn.textContent = 'הועתק ✓'; setTimeout(() => btn.textContent = t, 1500); }
 function open1(id) { window.open($(id).textContent); }
