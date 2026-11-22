@@ -1,0 +1,262 @@
+[
+ {
+  "text": "Which candle do you light first on the menorah?",
+  "options": [
+   "The rightmost one",
+   "The leftmost one — tonight's new candle",
+   "The middle one",
+   "It doesn't matter"
+  ],
+  "correct": 2
+ },
+ {
+  "text": "Which day of Chanukah is called \"Zos Chanukah\"?",
+  "options": [
+   "The first day",
+   "The fourth day",
+   "The eighth day",
+   "Shabbos Chanukah"
+  ],
+  "correct": 3
+ },
+ {
+  "text": "What was the oil jug wearing?",
+  "options": [
+   "A crown",
+   "A chef's hat",
+   "Sunglasses",
+   "A ribbon"
+  ],
+  "correct": 1,
+  "image": "memory/memory-jug.webp"
+ },
+ {
+  "text": "About how many sufganiyos are sold in Eretz Yisroel each Chanukah season?",
+  "options": [
+   "2.5 million",
+   "25–30 million",
+   "100 million",
+   "250 million"
+  ],
+  "correct": 2
+ },
+ {
+  "text": "In which mesechta of the Gemara is the miracle of the oil told?",
+  "options": [
+   "Brachos",
+   "Shabbos",
+   "Megillah",
+   "Rosh Hashanah"
+  ],
+  "correct": 2,
+  "bonus": true
+ },
+ {
+  "text": "Which oil is the most mehudar for lighting the menorah?",
+  "options": [
+   "Canola oil",
+   "Olive oil",
+   "Sesame oil",
+   "Sunflower oil"
+  ],
+  "correct": 2
+ },
+ {
+  "text": "Where does the name \"Chanukah\" come from?",
+  "options": [
+   "A city named Chanukah",
+   "Chanu — they rested from battle — on the 25th (Chof-Hei) of Kislev",
+   "The eighth candle",
+   "Mattisyahu ben Chanoch"
+  ],
+  "correct": 2
+ },
+ {
+  "text": "Which dreidel was in second place?",
+  "options": [
+   "Blue",
+   "Yellow",
+   "Green",
+   "Red"
+  ],
+  "correct": 1,
+  "image": "memory/memory-race.webp"
+ },
+ {
+  "text": "When Shabbos is Rosh Chodesh Teves during Chanukah, how many Sifrei Torah are taken out?",
+  "options": [
+   "1",
+   "2",
+   "3",
+   "4"
+  ],
+  "correct": 3
+ },
+ {
+  "text": "Who composed \"Maoz Tzur\"? (Hint: his name is hidden in the first letters of the stanzas)",
+  "options": [
+   "Rabbi Yehuda HaLevi",
+   "Rabbi Shlomo Alkabetz",
+   "A paytan named Mordechai",
+   "Rashi"
+  ],
+  "correct": 3,
+  "bonus": true
+ },
+ {
+  "text": "Which month begins in the middle of Chanukah?",
+  "options": [
+   "Kislev",
+   "Teves",
+   "Shvat",
+   "Cheshvan"
+  ],
+  "correct": 2
+ },
+ {
+  "text": "A Chanukah candle went out by itself right after lighting. What is the basic halacha?",
+  "options": [
+   "Relight it with a bracha",
+   "Relight it without a bracha",
+   "There is no obligation to relight it",
+   "Relight the whole menorah"
+  ],
+  "correct": 3
+ },
+ {
+  "text": "What was under the frying pan?",
+  "options": [
+   "A blue gas flame",
+   "An electric hot plate",
+   "A campfire",
+   "Nothing"
+  ],
+  "correct": 1,
+  "image": "memory/memory-latkes.webp"
+ },
+ {
+  "text": "The gematria of the dreidel letters Nun Gimmel Hei Shin equals the gematria of:",
+  "options": [
+   "Yerushalayim",
+   "Chanukah",
+   "Moshiach",
+   "Shalom"
+  ],
+  "correct": 3
+ },
+ {
+  "text": "Which parsha is read from the Torah on Chanukah?",
+  "options": [
+   "Behaaloscha",
+   "Naso",
+   "Terumah",
+   "Vayakhel"
+  ],
+  "correct": 2,
+  "bonus": true
+ },
+ {
+  "text": "What do we start saying in Shemoneh Esrei in America around December 4–5?",
+  "options": [
+   "Al Hanisim",
+   "Mashiv HaRuach",
+   "V'sein Tal U'matar",
+   "Yaaleh V'yavo"
+  ],
+  "correct": 3
+ },
+ {
+  "text": "If you forgot \"Al Hanisim\" and remembered after finishing that bracha:",
+  "options": [
+   "Go back to the start of the bracha",
+   "Go back to the start of Shemoneh Esrei",
+   "Don't go back",
+   "Say it only at the very end"
+  ],
+  "correct": 3
+ },
+ {
+  "text": "What was wrong in the picture?",
+  "options": [
+   "The menorah had only 7 candles",
+   "The sufganiyos had no jelly",
+   "The candles weren't lit",
+   "The menorah was upside down"
+  ],
+  "correct": 1,
+  "image": "memory/memory-menorah.webp"
+ },
+ {
+  "text": "Which Tehillim, \"Mizmor Shir Chanukas HaBayis\", is customarily said on Chanukah?",
+  "options": [
+   "Kapitel 20",
+   "Kapitel 30",
+   "Kapitel 91",
+   "Kapitel 121"
+  ],
+  "correct": 2
+ },
+ {
+  "text": "What is the highest a Chanukah candle may be placed and still be kosher?",
+  "options": [
+   "3 tefachim",
+   "10 tefachim",
+   "20 amos",
+   "There is no limit"
+  ],
+  "correct": 3,
+  "bonus": true
+ },
+ {
+  "text": "About how many years before the Churban of the Second Beis Hamikdash was the Chanukah miracle?",
+  "options": [
+   "70",
+   "130",
+   "230",
+   "400"
+  ],
+  "correct": 3
+ },
+ {
+  "text": "About how long from the start of the Chashmonaim's revolt until the Beis Hamikdash was purified?",
+  "options": [
+   "Half a year",
+   "3 years",
+   "7 years",
+   "10 years"
+  ],
+  "correct": 2
+ },
+ {
+  "text": "How many dreidels were flying in the air?",
+  "options": [
+   "3",
+   "4",
+   "5",
+   "6"
+  ],
+  "correct": 3,
+  "image": "memory/memory-chef.webp"
+ },
+ {
+  "text": "On Erev Shabbos Chanukah, which do we light first?",
+  "options": [
+   "Chanukah candles",
+   "Shabbos candles",
+   "Both together",
+   "It doesn't matter"
+  ],
+  "correct": 1
+ },
+ {
+  "text": "Which of Mattisyahu's sons was killed when an elephant fell on him in battle?",
+  "options": [
+   "Yehuda",
+   "Elazar",
+   "Yonasan",
+   "Shimon"
+  ],
+  "correct": 2,
+  "bonus": true
+ }
+]

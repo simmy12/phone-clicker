@@ -1,0 +1,34 @@
+[
+ {
+  "text": "How many days is Chanukah?",
+  "options": [
+   "7",
+   "8",
+   "9",
+   "10"
+  ],
+  "correct": 2
+ },
+ {
+  "text": "What color was the dreidel in the picture?",
+  "options": [
+   "Gold",
+   "Blue",
+   "Red",
+   "Green"
+  ],
+  "correct": 1,
+  "image": "bonus.webp"
+ },
+ {
+  "text": "Which fried treat do we eat on Chanukah?",
+  "options": [
+   "Sufganiyos",
+   "Matzah",
+   "Hamantaschen",
+   "Challah"
+  ],
+  "correct": 1,
+  "bonus": true
+ }
+]
