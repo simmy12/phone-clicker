@@ -29,11 +29,13 @@
   <div class="card">
     <label>סיסמת ניהול</label>
     <input id="key" type="password">
+    <div class="msg" id="balance" style="display:none"></div>
   </div>
   <div class="card">
     <h2>👀 לראות איך המשחק נראה</h2>
     <div class="hint">משחק לדוגמה עם 6 שחקנים מדומים שמתחברים ועונים לבד, בלי טלפונים. לא עולה כלום.</div>
-    <button onclick="preview()">פתח משחק לדוגמה</button>
+    <button onclick="preview('he')">פתח משחק לדוגמה (עברית)</button>
+    <button onclick="preview('en')">Sample game (English)</button>
   </div>
   <div class="card">
     <h2>📞 בדיקת עומס בשיחות אמיתיות</h2>
@@ -50,6 +52,8 @@
   </div>
   <div class="card">
     <h2>משחק חדש ללקוח</h2>
+    <label>שפת המשחק</label>
+    <select id="lang"><option value="en">English · אנגלית</option><option value="he">עברית</option></select>
     <div class="grid">
       <div><label>שם (יופיע על המסך)</label><input id="title" placeholder="לדוגמה: הטריוויה של משפחת כהן"></div>
       <div><label>מספר שחקנים</label><input id="max" type="number" value="8" min="1" max="100"></div>
@@ -81,11 +85,20 @@ async function post(path, body) {
 }
 async function create() {
   localStorage.setItem('adminKey', $('key').value);
-  const r = await post('/api/admin/create', { title: $('title').value, maxPlayers: $('max').value, days: $('days').value });
+  const r = await post('/api/admin/create', { title: $('title').value, maxPlayers: $('max').value, days: $('days').value, lang: $('lang').value });
   $('err').textContent = r.error || '';
   if (!r.real) return;
   $('real').textContent = r.real; $('demo').textContent = r.demo; $('out').style.display = 'block';
-  $('msgText').textContent =
+  $('msgText').textContent = $('lang').value === 'en' ?
+`Hi! Here is your Chanukah trivia game 🕎
+
+🧪 Practice link (3 questions, try it as many times as you like):
+${r.demo}
+
+🎮 Your game (one time only — open it when everyone is ready):
+${r.real}
+
+How to play: open the link on a computer connected to a TV or screen, type each player's name and phone number, everyone calls the number shown on the screen and waits for the beep, then answers by pressing the keys on their phone. Enjoy!` :
 `שלום! הנה המשחק שלכם 🎉
 
 🧪 קישור ניסיון (3 שאלות, אפשר לנסות כמה פעמים):
@@ -97,10 +110,10 @@ ${r.real}
 איך משחקים: פותחים את הקישור במחשב שמחובר למסך, רושמים שמות ומספרי טלפון, כולם מתקשרים למספר שעל המסך ומחכים לצפצוף, ועונים בלחיצה על מספר התשובה. בהצלחה!`;
   load();
 }
-async function preview() {
+async function preview(lang) {
   localStorage.setItem('adminKey', $('key').value);
   const w = window.open('', '_blank');
-  const r = await post('/api/admin/preview', {});
+  const r = await post('/api/admin/preview', { lang });
   if (r.link) w.location = r.link; else { w.close(); $('err').textContent = r.error || ''; }
 }
 async function loadStart() {
@@ -128,7 +141,16 @@ async function load() {
   $('games').innerHTML = r.map(g => { const [c, n] = stName(g);
     return `<tr><td>${esc(g.title || '—')}</td><td>${g.connected}/${g.players || 0} (עד ${g.max})</td><td><span class="st ${c}">${n}</span></td><td>${g.startedAt ? new Date(g.startedAt).toLocaleString('he-IL') : ''}</td></tr>`; }).join('') || '<tr><td colspan="4">אין עדיין</td></tr>';
 }
-load(); setInterval(load, 5000);
+async function balance() {
+  if (!$('key').value) return;
+  const r = await post('/api/admin/balance', {});
+  if (r.balance == null) return;
+  const low = r.balance < 6;
+  $('balance').style.display = 'block';
+  $('balance').style.background = low ? '#fee2e2' : '#ecfdf5';
+  $('balance').textContent = `יתרה ב-Twilio: $${r.balance.toFixed(2)}` + (low ? ' · ⚠️ נמוכה! כדאי להטעין לפני המשחק הבא' : '');
+}
+load(); balance(); setInterval(load, 5000); setInterval(balance, 60000);
 </script>
 </body>
 </html>

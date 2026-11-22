@@ -23,7 +23,7 @@ async function api(path, body) {
 }
 async function act(a, extra = {}) { audio.unlock(); const r = await api('/api/game/' + a, extra); if (r.error) showErr(r); poll(); return r; }
 function showErr(r) {
-  const map = { tooMany: t('errTooMany', { max: r.max }), samePhone: t('errSamePhone'), noPlayers: t('errNoPlayers'), started: t('errStarted'), linkUsed: t('linkUsed') };
+  const map = { tooMany: t('errTooMany', { max: r.max }), samePhone: t('errSamePhone'), phoneBusy: t('errPhoneBusy', { name: r.name }), noPlayers: t('errNoPlayers'), started: t('errStarted'), linkUsed: t('linkUsed') };
   $('setupErr').textContent = map[r.error] || r.error;
 }
 
@@ -134,7 +134,7 @@ const audio = (() => {
     const a = file(name);
     duck(3500);
     if (a && a.readyState >= 2) { const c = a.cloneNode(); c.volume = 1; live.add(c); c.onended = () => live.delete(c); c.play().catch(() => {}); return; }
-    try { const u = new SpeechSynthesisUtterance(text); u.lang = 'he-IL'; u.rate = .9; u.pitch = .8; u.volume = 1; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch {}
+    try { const u = new SpeechSynthesisUtterance(text); u.lang = L.lang === 'en' ? 'en-US' : 'he-IL'; u.rate = .9; u.pitch = .8; u.volume = 1; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch {}
   }
   return { unlock, sfx, play, stop, toggle, duck, say, preload: names => names.forEach(file), get on() { return on; } };
 })();
@@ -349,6 +349,7 @@ function renderIntro() {
   audio.play(gameTrack()); audio.sfx(bonus ? 'bonus' : 'whoosh');
   if (S.qIndex === 0 && !bonus && (S.remainingMs || 0) > 4000) return countdown321();
   $('introTxt').textContent = bonus ? t('bonus') : t('question', { n: S.qIndex + 1 });
+  $('introTxt').style.whiteSpace = 'nowrap'; fitText($('introTxt'), 1700, 230);
   $('introSub').textContent = bonus ? t('bonusSub') : ((S.qIndex % S.roundSize === 0 && S.roundSize < 100) ? t('roundOf', { n: Math.floor(S.qIndex / S.roundSize) + 1 }) : '');
   $('introBonusImg').classList.toggle('hidden', !bonus);
   if (bonus) { $('introBonusImg').src = `themes/${S.theme.id}/${S.theme.bonusImage}`; fx.show(3, 350); }
@@ -359,11 +360,11 @@ function renderIntro() {
 function countdown321() {
   const el = $('introTxt'); $('introSub').textContent = ''; $('introBonusImg').classList.add('hidden');
   ['3', '2', '1'].forEach((n, i) => setTimeout(() => {
-    el.textContent = n; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+    el.textContent = n; el.style.fontSize = ''; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
     el.classList.add('count'); flash(); audio.sfx('tick'); fx.firework(500 + Math.random() * 920, 250 + Math.random() * 300);
   }, i * 1100));
   setTimeout(() => {
-    el.classList.remove('count'); el.textContent = t('question', { n: 1 });
+    el.classList.remove('count'); el.textContent = t('question', { n: 1 }); el.style.whiteSpace = 'nowrap'; fitText(el, 1700, 230);
     el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
     flash(); push(); audio.sfx('whoosh'); fx.show(3, 250); fx.confetti(120);
     $('introSub').textContent = t('roundOf', { n: 1 });
@@ -552,11 +553,18 @@ async function poll() {
   } catch (e) { /* server waking up */ }
 }
 
-(async () => {
-  try { L = await (await fetch('lang/' + (document.documentElement.lang || 'he') + '.json')).json(); } catch { L = {}; }
+async function loadLang(code) {
+  try { L = await (await fetch('lang/' + code + '.json')).json(); } catch { L = {}; }
   applyTexts();
+}
+(async () => {
+  await loadLang('he');
   $('msgTitle').textContent = t('connecting'); show('msg');
   if (!TOKEN) { $('msgTitle').textContent = t('linkBad'); return; }
+  try {   // pick the game's language before the first screen is drawn
+    const first = await api('/api/game');
+    if (first.lang && first.lang !== 'he') await loadLang(first.lang);
+  } catch {}
   poll(); setInterval(poll, 600);
 })();
 })();
