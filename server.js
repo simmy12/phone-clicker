@@ -567,6 +567,5 @@ app.post('/bot', twilioOnly, (req, res) => {
   res.type('text/xml').send(r.toString());
 });
 
-app.get('/', (req, res) => res.redirect('/admin.html'));
 
 app.listen(PORT, () => console.log(`Clicker trivia on port ${PORT} (storage: ${store.kind}, language: ${LANG})`));
