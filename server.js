@@ -102,7 +102,7 @@ function newGame(info) {
     const g = { ...baseGame(info), status: 'lobby', mode: 'auto', seconds: 15 };
     g.players = SIM_NAMES.slice(0, 6).map((name, i) => ({ name, phone: '+1000000000' + i, sim: true, skill: .45 + i * .08,
       connected: false, lastSeen: 0, callSid: '', answers: {} }));
-    g.players.forEach((p, i) => setTimeout(() => { p.connected = true; p.lastSeen = Date.now(); }, 1500 + i * 1300));
+    g.players.forEach((p, i) => setTimeout(() => { p.connected = true; p.lastSeen = Date.now(); setTimeout(() => { p.tested = true; }, 1800); }, 1500 + i * 1300));
     return g;
   }
   return baseGame(info);
@@ -317,8 +317,25 @@ function twiml(req, res, build) {
   res.type('text/xml').send(r.toString());
 }
 
+function findBySid(sid) {
+  for (const g of games.values()) {
+    if (!isLive(g)) continue;
+    const p = g.players.find(x => x.callSid === sid);
+    if (p) return { g, p };
+  }
+  return null;
+}
+function claimRobot(sid) {          // a load-test robot call: give it the next free seat
+  for (const g of games.values()) {
+    if (g.kind !== 'load' || !isLive(g)) continue;
+    const p = g.players.find(x => !x.callSid);
+    if (p) { p.callSid = sid; return { g, p }; }
+  }
+  return null;
+}
 function touchCall(req) {
-  const f = findPlayer(normPhone(req.body.From));
+  let f = findPlayer(normPhone(req.body.From)) || findBySid(req.body.CallSid);
+  if (!f && loadtest.number && normPhone(req.body.From) === loadtest.number) f = claimRobot(req.body.CallSid);
   if (f) { f.p.connected = true; f.p.lastSeen = Date.now(); f.p.callSid = req.body.CallSid; }
   return f;
 }
@@ -350,7 +367,10 @@ app.post('/answer', twilioOnly, (req, res) => {
   twiml(req, res, (r, play) => {
     if (!f) { play(r, 'end'); r.hangup(); return; }
     const { g, p } = f, q = questionsOf(g)[g.qIndex];
-    if (g.status === 'play' && g.phase === 'question' && !p.answers[g.qIndex] && digit >= 1 && digit <= q.options.length) {
+    if (g.status === 'lobby' && req.body.Digits) {          // line check in the waiting room: any key counts
+      p.tested = true; g.updatedAt = Date.now(); save(g);
+      play(r, 'ok');
+    } else if (g.status === 'play' && g.phase === 'question' && !p.answers[g.qIndex] && digit >= 1 && digit <= q.options.length) {
       play(r, 'ok');
       recordAnswer(g, p, digit);
     } else {
@@ -393,7 +413,7 @@ app.get('/api/game', withGame, (req, res) => {
     counts: reveal ? q.options.map((_, i) => g.players.filter(p => p.answers[g.qIndex]?.digit === i + 1).length) : null,
     answeredCount: q ? g.players.filter(p => p.answers[g.qIndex]).length : 0,
     connectedCount: g.players.filter(isConnected).length,
-    players: g.players.map(p => ({ name: p.name, phone: mask(p.phone), connected: isConnected(p) })),
+    players: g.players.map(p => ({ name: p.name, phone: mask(p.phone), connected: isConnected(p), tested: !!p.tested })),
     bonusRight: reveal && q.bonus ? g.players.filter(p => p.answers[g.qIndex]?.digit === q.correct).map(p => p.name) : null,
     ranking: g.phase === 'board' || g.status === 'finished' ? ranking(g) : null,
     prevRanking: g.phase === 'board' ? ranking(g, Math.floor(g.qIndex / roundSize(g)) * roundSize(g)) : null,
@@ -494,6 +514,57 @@ app.post('/api/admin/games', adminOnly, async (req, res) => {
              connected: live.players.filter(p => p.connected && Date.now() - p.lastSeen < STALE_MS).length,
              startedAt: live.startedAt, max: live.max };
   }));
+});
+
+// --- load test: Twilio calls our own number many times; robots press random keys ---
+const loadtest = { number: '', sids: [], placed: 0, requested: 0, errors: 0, lastError: '', running: false };
+app.post('/api/admin/loadtest', adminOnly, async (req, res) => {
+  if (!client) return res.status(400).json({ error: 'חסרים פרטי Twilio בשרת' });
+  if (loadtest.running) return res.status(400).json({ error: 'בדיקה כבר רצה' });
+  const count = Math.min(100, Math.max(1, parseInt(req.body.count, 10) || 20));
+  const nGames = Math.min(20, Math.max(1, parseInt(req.body.games, 10) || 1));
+  try {
+    const nums = await client.incomingPhoneNumbers.list({ limit: 1 });
+    loadtest.number = nums[0] ? normPhone(nums[0].phoneNumber) : '';
+  } catch (e) { return res.status(400).json({ error: e.message }); }
+  if (!loadtest.number) return res.status(400).json({ error: 'לא נמצא מספר ב-Twilio' });
+  const links = [];
+  for (let k = 0; k < nGames; k++) {
+    const size = Math.floor(count / nGames) + (k < count % nGames ? 1 : 0);
+    const id = 'load-' + crypto.randomBytes(4).toString('hex');
+    const g = { ...baseGame({ id, k: 'load', th: 'hanukkah', title: `בדיקת עומס ${k + 1}`, max: size }), status: 'lobby', mode: 'auto', seconds: 15 };
+    g.players = Array.from({ length: size }, (_, i) => ({ name: `רובוט ${k + 1}-${i + 1}`, phone: `robot-${id}-${i}`, connected: false, lastSeen: 0, callSid: '', answers: {} }));
+    games.set(id, g);
+    links.push(`${baseOf(req)}/play.html?t=${makeToken({ id, k: 'load', th: 'hanukkah', title: g.title, max: size, exp: Date.now() + 86400000 })}`);
+  }
+  Object.assign(loadtest, { sids: [], placed: 0, requested: count, errors: 0, lastError: '', running: true });
+  res.json({ links });
+  for (let i = 0; i < count && loadtest.running; i++) {
+    try {
+      const c = await client.calls.create({ to: loadtest.number, from: loadtest.number, url: baseOf(req) + '/bot', method: 'POST', timeLimit: 1800 });
+      loadtest.sids.push(c.sid); loadtest.placed++;
+    } catch (e) { loadtest.errors++; loadtest.lastError = e.message; }
+    await new Promise(r => setTimeout(r, 1100));   // Twilio's default: about one new call per second
+  }
+  loadtest.running = false;
+});
+app.post('/api/admin/loadtest/stop', adminOnly, async (req, res) => {
+  loadtest.running = false; res.json({ ok: true });
+  for (const sid of loadtest.sids) await client.calls(sid).update({ status: 'completed' }).catch(() => {});
+  loadtest.sids = [];
+  for (const g of games.values()) if (g.kind === 'load' && isLive(g)) finish(g);
+});
+app.post('/api/admin/loadtest/status', adminOnly, (req, res) => {
+  const lg = [...games.values()].filter(g => g.kind === 'load' && isLive(g));
+  res.json({ ...loadtest, sids: undefined, connected: lg.reduce((n, g) => n + g.players.filter(isConnected).length, 0) });
+});
+// the robot's side of the call: wait a few seconds, press a random key, repeat
+app.post('/bot', twilioOnly, (req, res) => {
+  const r = new twilio.twiml.VoiceResponse();
+  r.pause({ length: 3 + Math.floor(Math.random() * 6) });
+  r.play({ digits: 'w' + (1 + Math.floor(Math.random() * 4)) });
+  r.redirect({ method: 'POST' }, '/bot');
+  res.type('text/xml').send(r.toString());
 });
 
 app.get('/', (req, res) => res.redirect('/admin.html'));
