@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>שעשועון הקליקרים הטלפוני · Phone Clicker Trivia</title>
+<meta name="description" content="Live trivia game for families and events. Players answer from any phone, including basic and kosher phones, by calling a number and pressing keys.">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Rubik",Arial,sans-serif; color:#fff; background:#0b0a2e; }
+  .hero { min-height:88vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:60px 24px;
+    background:linear-gradient(180deg, rgba(11,10,46,.35), rgba(11,10,46,.92)), url(themes/base/bg-main.webp) center/cover; }
+  h1 { font-weight:900; font-size:clamp(40px,7vw,86px); margin:0; line-height:1.05; color:transparent;
+    background:linear-gradient(180deg,#fffbe6,#ffe680 36%,#f2a900 50%,#ffcf3f 68%,#fff3b8); -webkit-background-clip:text; background-clip:text;
+    filter:drop-shadow(0 3px 0 #7d4600) drop-shadow(0 12px 18px rgba(0,0,0,.6)); }
+  .en { font-size:clamp(18px,2.4vw,26px); color:#cfe9ff; margin-top:14px; font-weight:700; direction:ltr; }
+  .lead { max-width:760px; font-size:clamp(18px,2.2vw,24px); line-height:1.6; margin:26px auto 0; font-weight:500; }
+  section { max-width:1000px; margin:0 auto; padding:60px 24px; }
+  h2 { font-weight:900; font-size:34px; color:#ffe9a8; margin:0 0 26px; text-align:center; }
+  .steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:20px; }
+  .step { background:linear-gradient(180deg,#1a1450,#120d3a); border-radius:24px; padding:26px; box-shadow:0 0 0 3px #f9cf4f, 0 18px 30px rgba(0,0,0,.4); }
+  .step b { display:inline-grid; place-items:center; width:46px; height:46px; border-radius:50%; background:#ffcf3f; color:#3d1600; font-size:24px; margin-bottom:12px; }
+  .step h3 { margin:0 0 8px; font-size:24px; } .step p { margin:0; line-height:1.55; color:#d9d6ff; font-weight:500; }
+  .ltr { direction:ltr; text-align:left; }
+  footer { text-align:center; padding:40px 24px 60px; color:#b9b3e6; font-size:16px; line-height:1.8; }
+  a { color:#ffe27a; }
+</style>
+</head>
+<body>
+  <div class="hero">
+    <h1>שעשועון הקליקרים הטלפוני</h1>
+    <div class="en">Phone Clicker Trivia · Live game show for families and events</div>
+    <p class="lead">משחק טריוויה חי על המסך הגדול. כל משתתף עונה מהטלפון שלו, כולל טלפון פשוט או כשר, בחיוג למספר ולחיצה על המקשים. בלי אפליקציה ובלי אינטרנט בטלפון.</p>
+  </div>
+  <section>
+    <h2>איך זה עובד</h2>
+    <div class="steps">
+      <div class="step"><b>1</b><h3>פותחים את המשחק</h3><p>המארגן פותח את הקישור למשחק במחשב שמחובר למסך או למקרן.</p></div>
+      <div class="step"><b>2</b><h3>כולם מחייגים</h3><p>כל משתתף מתקשר למספר שעל המסך ושומע צפצוף שמאשר שהוא מחובר.</p></div>
+      <div class="step"><b>3</b><h3>עונים במקשים</h3><p>השאלות מופיעות על המסך, ועונים בלחיצה על 1, 2, 3 או 4. בסוף: מנצחים, גביעים ופודיום.</p></div>
+    </div>
+  </section>
+  <section class="ltr">
+    <h2>About</h2>
+    <p class="lead" style="margin:0">Phone Clicker Trivia is an interactive trivia game for family gatherings and community events in the United States.
+      Players join by placing a regular voice call to our game number and answer questions using their phone keypad (DTMF).
+      We only receive inbound calls from players who choose to join a game. We do not make marketing calls or send messages.</p>
+  </section>
+  <footer>
+    Phone Clicker Trivia · Contact: <a href="mailto:simi0527@gmail.com">simi0527@gmail.com</a><br>
+    © 2026
+  </footer>
+</body>
+</html>
