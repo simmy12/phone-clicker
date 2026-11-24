@@ -3,164 +3,548 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ניהול משחקים</title>
+<title>Tricky Trivia · ניהול</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-  body { margin:0; font-family:"Segoe UI",Arial,sans-serif; background:#f3f1fb; color:#1f1b3a; }
-  .wrap { max-width:820px; margin:36px auto; padding:0 20px; }
-  .card { background:#fff; border-radius:16px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.06); margin-bottom:20px; }
-  h1 { margin:0 0 20px; } h2 { margin:0 0 14px; font-size:22px; }
-  label { display:block; margin:12px 0 4px; font-weight:600; }
-  input, select { font:inherit; font-size:17px; padding:10px; border:1px solid #ccc; border-radius:8px; width:100%; box-sizing:border-box; }
-  .grid { display:grid; grid-template-columns:2fr 1fr 1fr; gap:14px; }
-  button { font:inherit; font-size:17px; font-weight:700; padding:12px 22px; border:0; border-radius:10px; background:#7c3aed; color:#fff; cursor:pointer; margin-top:16px; }
-  button.sm { font-size:14px; padding:6px 12px; margin:0 0 0 6px; background:#ede9fe; color:#5b21b6; }
-  .link { display:flex; align-items:center; gap:8px; margin-top:12px; padding:12px; background:#f5f3ff; border-radius:10px; }
-  .link b { white-space:nowrap; } .link code { flex:1; direction:ltr; font-size:12px; word-break:break-all; }
-  .msg { margin-top:16px; padding:14px; border-radius:10px; background:#ecfdf5; white-space:pre-line; font-size:15px; }
-  .err { color:#b91c1c; margin-top:10px; }
-  table { width:100%; border-collapse:collapse; font-size:15px; } td, th { padding:8px; border-bottom:1px solid #eee; text-align:right; }
-  .st { padding:2px 10px; border-radius:20px; font-size:13px; } .st.new { background:#e0f2fe; } .st.play { background:#fef3c7; } .st.done { background:#dcfce7; }
-  .hint { color:#6b7280; font-size:14px; margin-top:6px; }
+:root {
+  --ink:#1c1638; --muted:#6b6790; --line:#e7e4f3; --bg:#f6f5fb; --card:#fff;
+  --violet:#5b3fd6; --violet-2:#efeafe; --gold:#e9a90c; --gold-2:#fff6db;
+  --red:#d93a4a; --red-bg:#fdecee; --orange:#e7861b; --orange-bg:#fff3e2; --green:#1f9d57; --green-bg:#e6f6ec; --gray:#8b88a3; --gray-bg:#f1f0f6;
+}
+* { box-sizing:border-box; }
+body { margin:0; font-family:Rubik, "Segoe UI", Arial, sans-serif; background:var(--bg); color:var(--ink); font-size:15px; }
+button, input, select, textarea { font:inherit; color:inherit; }
+button { cursor:pointer; }
+:focus-visible { outline:3px solid #a78bfa; outline-offset:2px; }
+
+/* layout */
+.app { display:grid; grid-template-columns:240px 1fr; min-height:100vh; }
+.side { background:#1c1638; color:#fff; padding:22px 14px; display:flex; flex-direction:column; gap:6px; position:sticky; top:0; height:100vh; }
+.brand { font-weight:800; font-size:21px; padding:4px 10px 18px; line-height:1.15; }
+.brand small { display:block; font-weight:500; font-size:13px; color:#b9b2e6; margin-top:4px; }
+.nav { display:flex; align-items:center; gap:10px; width:100%; border:0; background:none; color:#d9d4f7; padding:11px 12px; border-radius:10px; font-size:16px; font-weight:500; text-align:right; }
+.nav:hover { background:rgba(255,255,255,.07); }
+.nav.on { background:#fff; color:var(--ink); font-weight:700; }
+.nav .n { margin-inline-start:auto; background:var(--red); color:#fff; font-size:12px; font-weight:700; border-radius:20px; padding:1px 8px; }
+.side .foot { margin-top:auto; font-size:13px; color:#b9b2e6; padding:10px; border-top:1px solid rgba(255,255,255,.12); }
+.side .foot b { color:#fff; font-size:16px; display:block; margin-top:2px; }
+.side .foot b.low { color:#ff9aa5; }
+main { padding:28px 34px 60px; min-width:0; }
+.head { display:flex; align-items:flex-end; gap:16px; margin-bottom:18px; flex-wrap:wrap; }
+.head h1 { margin:0; font-size:28px; font-weight:800; }
+.sync { font-size:13px; color:var(--muted); }
+.sync.bad { color:var(--red); font-weight:500; }
+.sync a { color:var(--violet); font-weight:700; cursor:pointer; }
+.spacer { flex:1; }
+
+/* buttons */
+.btn { border:0; border-radius:10px; padding:10px 18px; font-weight:700; font-size:15px; background:var(--violet); color:#fff; white-space:nowrap; }
+.btn:hover { filter:brightness(1.08); }
+.btn.ghost { background:#fff; color:var(--ink); border:1px solid var(--line); }
+.btn.soft { background:var(--violet-2); color:var(--violet); }
+.btn.gold { background:var(--gold); color:#2a1d00; }
+.btn.danger { background:#fff; color:var(--red); border:1px solid #f3c1c7; }
+.btn.sm { padding:7px 12px; font-size:13.5px; border-radius:8px; }
+.btn:disabled { opacity:.45; cursor:not-allowed; filter:none; }
+
+/* filters */
+.bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+.chip { border:1px solid var(--line); background:#fff; border-radius:30px; padding:7px 14px; font-weight:500; display:flex; gap:8px; align-items:center; }
+.chip i { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.chip b { font-weight:700; color:var(--muted); }
+.chip.on { border-color:var(--ink); background:var(--ink); color:#fff; }
+.chip.on b { color:#fff; }
+.search { border:1px solid var(--line); border-radius:10px; padding:9px 12px; min-width:220px; background:#fff; }
+
+/* table */
+.tbl { background:#fff; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+table { width:100%; border-collapse:collapse; }
+th { text-align:right; font-size:12.5px; font-weight:700; color:var(--muted); padding:12px 14px; background:#fbfaff; border-bottom:1px solid var(--line); }
+td { padding:13px 14px; border-bottom:1px solid var(--line); vertical-align:middle; }
+tr:last-child td { border-bottom:0; }
+tr.st-new td { background:var(--red-bg); } tr.st-created td { background:var(--orange-bg); } tr.st-sent td { background:var(--green-bg); } tr.st-played td { background:var(--gray-bg); }
+tr td:first-child { border-inline-start:6px solid transparent; }
+tr.st-new td:first-child { border-inline-start-color:var(--red); } tr.st-created td:first-child { border-inline-start-color:var(--orange); }
+tr.st-sent td:first-child { border-inline-start-color:var(--green); } tr.st-played td:first-child { border-inline-start-color:var(--gray); }
+.status { display:inline-block; font-size:12.5px; font-weight:700; border-radius:20px; padding:3px 10px; color:#fff; white-space:nowrap; }
+.status.idle { background:var(--violet); } .status.new { background:var(--red); } .status.created { background:var(--orange); } .status.sent { background:var(--green); } .status.played { background:var(--gray); }
+.who b { display:block; font-size:15.5px; }
+.who span { display:block; color:var(--muted); font-size:13px; direction:ltr; text-align:right; }
+.ord { color:var(--muted); font-size:13px; } .ord b { color:var(--ink); font-size:14px; display:block; }
+.src { display:inline-block; font-size:11px; font-weight:700; color:var(--violet); background:var(--violet-2); border-radius:6px; padding:1px 6px; margin-top:3px; }
+.num { font-weight:800; font-size:18px; text-align:center; }
+.notes { color:var(--muted); font-size:13px; max-width:220px; }
+.acts { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.sentbox { display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:13.5px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:6px 10px; cursor:pointer; user-select:none; }
+.sentbox input { width:17px; height:17px; accent-color:var(--green); margin:0; }
+.empty { padding:50px 20px; text-align:center; color:var(--muted); }
+.empty b { display:block; font-size:18px; color:var(--ink); margin-bottom:6px; }
+
+/* cards (settings) */
+.cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:18px; }
+.card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:22px; }
+.card h2 { margin:0 0 6px; font-size:18px; }
+.card p { margin:0 0 14px; color:var(--muted); font-size:14px; line-height:1.55; }
+.big { font-size:34px; font-weight:800; }
+label.f { display:block; font-weight:700; font-size:13.5px; margin:12px 0 5px; }
+input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-radius:10px; padding:10px 12px; background:#fff; font-size:15px; }
+.row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.note { margin-top:12px; padding:10px 12px; border-radius:10px; font-size:14px; }
+.note.ok { background:var(--green-bg); color:#13633a; } .note.bad { background:var(--red-bg); color:#a1222f; } .note.info { background:var(--violet-2); color:#3d2a9a; }
+
+/* modal */
+.modal { position:fixed; inset:0; background:rgba(20,14,48,.55); display:grid; place-items:center; z-index:50; padding:20px; }
+.modal.hidden, .hidden { display:none !important; }
+.box { background:#fff; border-radius:18px; width:min(560px, 100%); max-height:92vh; overflow:auto; padding:26px 28px; box-shadow:0 30px 80px rgba(0,0,0,.35); }
+.box h2 { margin:0 0 4px; font-size:22px; }
+.box .sub { color:var(--muted); margin-bottom:16px; }
+.concepts { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:8px 0 4px; }
+.concept { border:2px solid var(--line); border-radius:14px; padding:18px; text-align:center; background:#fff; }
+.concept:hover:not(:disabled) { border-color:var(--violet); background:#faf8ff; }
+.concept .ic { font-size:40px; display:block; margin-bottom:6px; }
+.concept b { display:block; font-size:17px; }
+.concept span { color:var(--muted); font-size:13px; }
+.concept .soon { display:inline-block; margin-top:8px; background:var(--gold-2); color:#8a5a00; font-weight:700; font-size:12px; border-radius:20px; padding:2px 10px; }
+.seg { display:inline-flex; border:1px solid #d9d5ec; border-radius:10px; overflow:hidden; }
+.seg button { border:0; background:#fff; padding:9px 18px; font-weight:700; }
+.seg button.on { background:var(--violet); color:#fff; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.check { display:flex; gap:10px; align-items:flex-start; margin-top:16px; padding:12px; border-radius:10px; background:var(--gold-2); cursor:pointer; }
+.check input { width:19px; height:19px; margin-top:2px; accent-color:var(--gold); }
+.check small { display:block; color:#7a5b10; font-size:13px; }
+.foot-btns { display:flex; gap:10px; margin-top:20px; justify-content:flex-start; }
+.link { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--line); border-radius:12px; margin-top:10px; }
+.link .ic { font-size:22px; }
+.link div { flex:1; min-width:0; } .link b { display:block; } .link code { display:block; direction:ltr; text-align:left; font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.toast { position:fixed; bottom:26px; left:50%; translate:-50% 0; background:var(--ink); color:#fff; padding:11px 20px; border-radius:30px; font-weight:700; z-index:80; opacity:0; transition:opacity .2s; pointer-events:none; }
+.toast.on { opacity:1; }
+
+/* login */
+.login { position:fixed; inset:0; background:linear-gradient(160deg,#1c1638,#3b2a8f); display:grid; place-items:center; z-index:90; }
+.login .box { width:min(380px, 92vw); text-align:center; }
+.login .box .big { font-size:26px; margin-bottom:4px; }
+
+@media (max-width:900px) {
+  .app { grid-template-columns:1fr; }
+  .side { position:static; height:auto; flex-direction:row; flex-wrap:wrap; padding:12px; }
+  .brand { padding:4px 8px; width:100%; } .side .foot { display:none; }
+  .nav { width:auto; }
+  main { padding:18px 14px; }
+  th:nth-child(5), td:nth-child(5) { display:none; }
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>ניהול משחקים</h1>
-  <div class="card">
-    <label>סיסמת ניהול</label>
-    <input id="key" type="password">
-    <div class="msg" id="balance" style="display:none"></div>
-  </div>
-  <div class="card">
-    <h2>👀 לראות איך המשחק נראה</h2>
-    <div class="hint">משחק לדוגמה עם 6 שחקנים מדומים שמתחברים ועונים לבד, בלי טלפונים. לא עולה כלום.</div>
-    <button onclick="preview('he')">פתח משחק לדוגמה (עברית)</button>
-    <button onclick="preview('en')">Sample game (English)</button>
-  </div>
-  <div class="card">
-    <h2>📞 בדיקת עומס בשיחות אמיתיות</h2>
-    <div class="hint">Twilio מחייג למספר המשחק שוב ושוב, ו"רובוטים" לוחצים על מקשים כמו שחקנים אמיתיים. דורש חשבון Twilio משודרג.
-      עלות משוערת: כ-2 סנט לדקה לכל שיחה (100 שיחות × 5 דקות ≈ 10$).</div>
-    <div class="grid" style="grid-template-columns:1fr 1fr">
-      <div><label>כמה שיחות (עד 100)</label><input id="ltCount" type="number" value="10" min="1" max="100"></div>
-      <div><label>מחולקות לכמה משחקים</label><input id="ltGames" type="number" value="1" min="1" max="20"></div>
-    </div>
-    <button onclick="loadStart()">התחל בדיקת עומס</button>
-    <button onclick="loadStop()" style="background:#b91c1c">עצור ונתק את כל השיחות</button>
-    <div class="msg" id="ltStatus" style="display:none"></div>
-    <div id="ltLinks"></div>
-  </div>
-  <div class="card">
-    <h2>משחק חדש ללקוח</h2>
-    <label>שפת המשחק</label>
-    <select id="lang"><option value="en">English · אנגלית</option><option value="he">עברית</option></select>
-    <div class="grid">
-      <div><label>שם (יופיע על המסך)</label><input id="title" placeholder="לדוגמה: הטריוויה של משפחת כהן"></div>
-      <div><label>מספר שחקנים</label><input id="max" type="number" value="8" min="1" max="100"></div>
-      <div><label>תוקף (ימים)</label><input id="days" type="number" value="30" min="1" max="365"></div>
-    </div>
-    <div class="hint">הלקוח מקבל שני קישורים: קישור ניסיון (3 שאלות, אפשר לנסות כמה פעמים) וקישור למשחק האמיתי (פעם אחת בלבד).</div>
-    <button onclick="create()">צור קישורים</button>
-    <div class="err" id="err"></div>
-    <div id="out" style="display:none">
-      <div class="link"><b>🧪 ניסיון:</b><code id="demo"></code><button class="sm" onclick="copy('demo',this)">העתק</button><button class="sm" onclick="open1('demo')">פתח</button></div>
-      <div class="link"><b>🎮 המשחק:</b><code id="real"></code><button class="sm" onclick="copy('real',this)">העתק</button><button class="sm" onclick="open1('real')">פתח</button></div>
-      <div class="msg" id="msgText"></div>
-      <button class="sm" onclick="copy('msgText',this)">העתק הודעה ללקוח</button>
-    </div>
-  </div>
-  <div class="card">
-    <h2>🛒 הזמנות מהאתר</h2>
-    <table><thead><tr><th>מתי</th><th>שם</th><th>טלפון</th><th>חבילה</th><th>ערב</th><th>שפה</th><th>עיר / הערות</th></tr></thead><tbody id="orders"></tbody></table>
-  </div>
-  <div class="card">
-    <h2>משחקים</h2>
-    <table><thead><tr><th>שם</th><th>שחקנים</th><th>מצב</th><th>התחיל</th></tr></thead><tbody id="games"></tbody></table>
+
+<div class="login hidden" id="login">
+  <div class="box">
+    <div class="big">Tricky Trivia</div>
+    <div class="sub">כניסה למערכת הניהול</div>
+    <input class="in" id="pw" type="password" placeholder="סיסמת ניהול" autocomplete="current-password">
+    <div class="note bad hidden" id="pwErr">סיסמה שגויה</div>
+    <button class="btn" style="width:100%;margin-top:14px" id="pwGo">כניסה</button>
   </div>
 </div>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand">Tricky Trivia<small>מערכת ניהול</small></div>
+    <button class="nav on" data-v="orders">🛒 הזמנות <span class="n hidden" id="nNew"></span></button>
+    <button class="nav" data-v="games">🎮 כל המשחקים</button>
+    <button class="nav" data-v="settings">⚙️ הגדרות</button>
+    <div class="foot">יתרה ב-Twilio<b id="bal">—</b></div>
+  </aside>
+
+  <main>
+    <!-- orders -->
+    <section id="v-orders">
+      <div class="head">
+        <h1>הזמנות</h1>
+        <span class="sync" id="sync"></span>
+        <span class="spacer"></span>
+        <button class="btn ghost" id="refresh">↻ רענון</button>
+        <button class="btn" id="addOrder">+ הזמנה ידנית</button>
+      </div>
+      <div class="bar" id="filters"></div>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>מצב</th><th>הזמנה</th><th>לקוח</th><th style="text-align:center">משתתפים</th><th>הערות</th><th>פעולות</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- games -->
+    <section id="v-games" class="hidden">
+      <div class="head"><h1>כל המשחקים</h1><span class="sync">כולל משחקים שנוצרו בלי הזמנה</span></div>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>מצב</th><th>שם המשחק</th><th style="text-align:center">שחקנים</th><th>נוצר</th><th>פעולות</th></tr></thead>
+          <tbody id="gRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- settings -->
+    <section id="v-settings" class="hidden">
+      <div class="head"><h1>הגדרות</h1></div>
+      <div class="cards">
+        <div class="card">
+          <h2>📊 חיבור לטבלת ההזמנות</h2>
+          <p>הזמנות של טריוויה מגיעות לכאן מהטבלה בגוגל שיטס, בקריאה בלבד. שום דבר בטבלה לא משתנה.</p>
+          <label class="f">כתובת הסקריפט (מסתיימת ב-exec/)</label>
+          <input class="in" id="sUrl" dir="ltr" placeholder="https://script.google.com/macros/s/.../exec">
+          <label class="f">מפתח סודי</label>
+          <input class="in" id="sKey" dir="ltr" placeholder="מופיע בראש הסקריפט">
+          <div class="row" style="margin-top:14px"><button class="btn" id="sSave">שמור ובדוק חיבור</button></div>
+          <div class="note hidden" id="sNote"></div>
+        </div>
+        <div class="card">
+          <h2>💰 יתרה ב-Twilio</h2>
+          <p>כל דקת שיחה עולה כסנט. כשהיתרה נמוכה מ-$6 היא מסומנת באדום.</p>
+          <div class="big" id="bal2">—</div>
+        </div>
+        <div class="card">
+          <h2>👀 משחק לדוגמה</h2>
+          <p>6 שחקנים מדומים מתחברים ועונים לבד. בלי טלפונים ובלי עלות.</p>
+          <div class="row"><button class="btn soft" data-prev="en">Sample game (English)</button><button class="btn soft" data-prev="he">משחק לדוגמה (עברית)</button></div>
+        </div>
+        <div class="card">
+          <h2>📞 בדיקת עומס</h2>
+          <p>Twilio מחייג למספר המשחק, ו"רובוטים" לוחצים על מקשים. עולה כסף: בערך 2 סנט לדקה לכל שיחה. דורש פרופיל עסקי מאושר.</p>
+          <div class="grid2">
+            <div><label class="f">כמה שיחות (עד 100)</label><input class="in" id="ltCount" type="number" value="10" min="1" max="100"></div>
+            <div><label class="f">מחולקות לכמה משחקים</label><input class="in" id="ltGames" type="number" value="1" min="1" max="20"></div>
+          </div>
+          <div class="row" style="margin-top:14px"><button class="btn" id="ltStart">התחל</button><button class="btn danger" id="ltStop">עצור ונתק</button></div>
+          <div class="note info hidden" id="ltStatus"></div>
+          <div id="ltLinks"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- create / edit game -->
+<div class="modal hidden" id="mGame">
+  <div class="box">
+    <div id="gStep1">
+      <h2>משחק חדש</h2>
+      <div class="sub" id="gFor"></div>
+      <div class="concepts">
+        <button class="concept" id="cChanukah"><span class="ic">🕎</span><b>משחק חנוכה</b><span>המשחק המוכן, עם כל שאלות החנוכה</span></button>
+        <button class="concept" disabled><span class="ic">✏️</span><b>התאמה אישית</b><span>לשנות שאלות, סדר, רקע ואובייקטים</span><br><i class="soon">בקרוב</i></button>
+      </div>
+      <div class="foot-btns"><button class="btn ghost" data-close>ביטול</button></div>
+    </div>
+    <div id="gStep2" class="hidden">
+      <h2 id="gTitle">🕎 משחק חנוכה</h2>
+      <div class="sub" id="gFor2"></div>
+      <label class="f">השם שיופיע על המסך</label>
+      <input class="in" id="fTitle" maxlength="60">
+      <div class="grid2">
+        <div><label class="f">שפת המשחק</label><div class="seg" id="fLang"><button data-l="en" class="on">English</button><button data-l="he">עברית</button></div></div>
+        <div><label class="f">מספר משתתפים</label><input class="in" id="fPlayers" type="number" min="1" max="100"></div>
+      </div>
+      <div id="daysWrap"><label class="f">הקישור תקף ל־(ימים)</label><input class="in" id="fDays" type="number" value="30" min="1" max="365" style="max-width:140px"></div>
+      <label class="check"><input type="checkbox" id="fScore" checked><span><b>שמור טבלת ניקוד</b><small>בסוף המשחק תופיע כאן תמונה של הניקוד להורדה</small></span></label>
+      <div class="note bad hidden" id="gErr"></div>
+      <div class="foot-btns"><button class="btn" id="gSave">צור משחק</button><button class="btn ghost" data-close>ביטול</button></div>
+    </div>
+    <div id="gStep3" class="hidden">
+      <h2>🎉 המשחק מוכן</h2>
+      <div class="sub" id="gFor3"></div>
+      <div class="link"><span class="ic">🎮</span><div><b>קישור המשחק</b><code id="lReal"></code></div><button class="btn sm" data-copy="lReal">העתק</button></div>
+      <div class="link"><span class="ic">🧪</span><div><b>קישור תרגול</b><code id="lDemo"></code></div><button class="btn sm soft" data-copy="lDemo">העתק</button></div>
+      <div class="foot-btns"><button class="btn ghost" data-close>סגור</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- manual order -->
+<div class="modal hidden" id="mOrder">
+  <div class="box">
+    <h2 id="oTitle">הזמנה ידנית</h2>
+    <div class="sub">למי שהזמין לא דרך האתר. נשמר רק כאן.</div>
+    <label class="f">שם</label><input class="in" id="oName" maxlength="80">
+    <div class="grid2">
+      <div><label class="f">טלפון</label><input class="in" id="oPhone" dir="ltr"></div>
+      <div><label class="f">מספר משתתפים</label><input class="in" id="oPlayers" type="number" min="1" max="100" value="8"></div>
+    </div>
+    <label class="f">מייל (רשות)</label><input class="in" id="oEmail" dir="ltr">
+    <label class="f">הערות (רשות)</label><textarea class="in" id="oNotes" rows="2"></textarea>
+    <div class="note bad hidden" id="oErr"></div>
+    <div class="foot-btns"><button class="btn" id="oSave">שמור</button><button class="btn ghost" data-close>ביטול</button><span class="spacer"></span><button class="btn danger hidden" id="oDel">מחק הזמנה</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <script>
 const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-$('key').value = localStorage.getItem('adminKey') || '';
-$('key').onchange = () => { localStorage.setItem('adminKey', $('key').value); load(); };
-async function post(path, body) {
-  const r = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key: $('key').value, ...body }) });
-  return r.json();
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+let KEY = localStorage.getItem('adminKey') || '';
+let ORDERS = [], GAMES = [], FILTER = 'all', CUR = null, LANG = 'en', SHEET = { error:'', at:0 };
+const ST = { new:['לא נוצר','#d93a4a'], created:['נוצר, לא נשלח','#e7861b'], sent:['נשלח','#1f9d57'], played:['שוחק','#8b88a3'] };
+
+async function post(path, body = {}) {
+  const r = await fetch(path, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ key: KEY, ...body }) });
+  const j = await r.json().catch(() => ({ error:'שגיאת שרת' }));
+  if (r.status === 401) { showLogin(true); throw new Error('auth'); }
+  return j;
 }
-async function create() {
-  localStorage.setItem('adminKey', $('key').value);
-  const r = await post('/api/admin/create', { title: $('title').value, maxPlayers: $('max').value, days: $('days').value, lang: $('lang').value });
-  $('err').textContent = r.error || '';
-  if (!r.real) return;
-  $('real').textContent = r.real; $('demo').textContent = r.demo; $('out').style.display = 'block';
-  $('msgText').textContent = $('lang').value === 'en' ?
-`Hi! Here is your Chanukah trivia game 🕎
+function toast(t) { $('toast').textContent = t; $('toast').classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => $('toast').classList.remove('on'), 1800); }
+function copyText(t, msg) { navigator.clipboard.writeText(t).then(() => toast(msg || 'הועתק ✓')); }
+const fmtDate = ms => ms ? new Date(ms).toLocaleString('he-IL', { day:'numeric', month:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
 
-🧪 Practice link (3 questions, try it as many times as you like):
-${r.demo}
+/* login */
+function showLogin(bad) { $('login').classList.remove('hidden'); $('pwErr').classList.toggle('hidden', !bad); setTimeout(() => $('pw').focus(), 50); }
+$('pwGo').onclick = async () => { KEY = $('pw').value; localStorage.setItem('adminKey', KEY); $('login').classList.add('hidden'); boot(); };
+$('pw').onkeydown = e => { if (e.key === 'Enter') $('pwGo').click(); };
 
-🎮 Your game (one time only — open it when everyone is ready):
-${r.real}
-
-How to play: open the link on a computer connected to a TV or screen, type each player's name and phone number, everyone calls the number shown on the screen and waits for the beep, then answers by pressing the keys on their phone. Enjoy!` :
-`שלום! הנה המשחק שלכם 🎉
-
-🧪 קישור ניסיון (3 שאלות, אפשר לנסות כמה פעמים):
-${r.demo}
-
-🎮 המשחק האמיתי (פעם אחת בלבד, פתחו אותו רק כשכולם מוכנים):
-${r.real}
-
-איך משחקים: פותחים את הקישור במחשב שמחובר למסך, רושמים שמות ומספרי טלפון, כולם מתקשרים למספר שעל המסך ומחכים לצפצוף, ועונים בלחיצה על מספר התשובה. בהצלחה!`;
-  load();
+/* navigation */
+document.querySelectorAll('.nav').forEach(b => b.onclick = () => view(b.dataset.v));
+function view(v) {
+  document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  ['orders','games','settings'].forEach(x => $('v-' + x).classList.toggle('hidden', x !== v));
+  if (v === 'games') loadGames(); if (v === 'settings') loadSettings();
 }
-async function preview(lang) {
-  localStorage.setItem('adminKey', $('key').value);
-  const w = window.open('', '_blank');
-  const r = await post('/api/admin/preview', { lang });
-  if (r.link) w.location = r.link; else { w.close(); $('err').textContent = r.error || ''; }
+
+/* orders */
+async function loadOrders(refresh) {
+  const r = await post('/api/admin/orders', { refresh });
+  ORDERS = r.orders || []; SHEET = { error: r.sheetError, at: r.sheetAt };
+  renderOrders();
 }
-async function loadStart() {
+function renderOrders() {
+  const counts = { all: ORDERS.length, new:0, created:0, sent:0, played:0 };
+  ORDERS.forEach(o => counts[o.status]++);
+  $('nNew').textContent = counts.new; $('nNew').classList.toggle('hidden', !counts.new);
+  const chips = [['all','הכל',null], ['new','לא נוצר','#d93a4a'], ['created','נוצר ולא נשלח','#e7861b'], ['sent','נשלח','#1f9d57'], ['played','שוחק','#8b88a3']];
+  $('filters').innerHTML = chips.map(([k, t, c]) => `<button class="chip${FILTER === k ? ' on' : ''}" data-f="${k}">${c ? `<i style="background:${c}"></i>` : ''}${t} <b>${counts[k]}</b></button>`).join('')
+    + `<span class="spacer"></span><input class="search" id="q" placeholder="🔍 חיפוש לפי שם או טלפון" value="${esc($('q') ? $('q').value : '')}">`;
+  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { FILTER = b.dataset.f; renderOrders(); });
+  $('q').oninput = () => { const pos = $('q').selectionStart; renderOrders(); $('q').focus(); $('q').setSelectionRange(pos, pos); };
+  $('sync').className = 'sync' + (SHEET.error ? ' bad' : '');
+  $('sync').innerHTML = SHEET.error === 'notConnected' ? '⚠️ הטבלה עוד לא מחוברת · <a data-go="settings">לחיבור</a>'
+    : SHEET.error ? `⚠️ אין חיבור לטבלה (${esc(SHEET.error)}) · <a data-go="settings">להגדרות</a>`
+    : SHEET.at ? `מחובר לטבלה · עודכן ${new Date(SHEET.at).toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' })}` : '';
+  document.querySelectorAll('[data-go]').forEach(a => a.onclick = () => view(a.dataset.go));
+  const q = ($('q').value || '').trim().toLowerCase();
+  const list = ORDERS.filter(o => (FILTER === 'all' || o.status === FILTER) && (!q || (o.name + ' ' + o.phone + ' ' + o.orderNo).toLowerCase().includes(q)));
+  if (!list.length) { $('rows').innerHTML = `<tr><td colspan="6"><div class="empty"><b>${ORDERS.length ? 'אין הזמנות בסינון הזה' : 'עוד אין הזמנות'}</b>${ORDERS.length ? '' : 'הזמנות של טריוויה מהאתר יופיעו כאן לבד. אפשר גם להוסיף הזמנה ידנית.'}</div></td></tr>`; return; }
+  $('rows').innerHTML = list.map(o => {
+    const g = o.game, canEdit = g && !g.used && g.status !== 'finished' && g.status !== 'play';
+    const srcTag = o.src === 'manual' ? '<span class="src">ידנית</span>' : o.src === 'page' ? '<span class="src">דף הזמנה</span>' : '';
+    let acts;
+    if (!o.links) acts = `<button class="btn sm" data-create="${esc(o.key)}">✨ צור משחק</button>`;
+    else acts = `<button class="btn sm" data-cp="real" data-k="${esc(o.key)}">🎮 העתק קישור משחק</button>
+      <button class="btn sm soft" data-cp="demo" data-k="${esc(o.key)}">🧪 העתק קישור תרגול</button>
+      <button class="btn sm ghost" data-edit="${esc(o.key)}" ${canEdit ? '' : 'disabled title="המשחק כבר התחיל"'}>✏️ ערוך</button>
+      ${o.status !== 'played' ? `<label class="sentbox"><input type="checkbox" data-sent="${esc(o.key)}" ${o.sent ? 'checked' : ''}>נשלח</label>` : ''}
+      ${g && g.scoreTable && g.status === 'finished' ? `<button class="btn sm gold" data-score="${esc(g.id)}">📥 הורד ניקוד</button>` : ''}`;
+    if (o.src === 'manual') acts += ` <button class="btn sm ghost" data-morder="${esc(o.key)}" title="עריכת פרטי ההזמנה">⋯</button>`;
+    return `<tr class="st-${o.status}">
+      <td><span class="status ${o.status}">${ST[o.status][0]}</span></td>
+      <td class="ord"><b>${o.orderNo ? '#' + esc(o.orderNo) : '—'}</b>${fmtDate(o.date)}<br>${srcTag}${o.pkg ? `<span class="src" style="background:#f3f1fb;color:#555">${esc(o.pkg)}</span>` : ''}</td>
+      <td class="who"><b dir="auto">${esc(o.name)}</b><span>${esc(o.phone)}</span>${o.email ? `<span>${esc(o.email)}</span>` : ''}</td>
+      <td class="num">${g ? g.max : o.players}</td>
+      <td class="notes" dir="auto">${esc(o.notes)}</td>
+      <td><div class="acts">${acts}</div></td></tr>`;
+  }).join('');
+  document.querySelectorAll('[data-create]').forEach(b => b.onclick = () => openCreate(b.dataset.create));
+  document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEdit(b.dataset.edit));
+  document.querySelectorAll('[data-cp]').forEach(b => b.onclick = () => { const o = ORDERS.find(x => x.key === b.dataset.k); copyText(o.links[b.dataset.cp], b.dataset.cp === 'real' ? 'קישור המשחק הועתק ✓' : 'קישור התרגול הועתק ✓'); });
+  document.querySelectorAll('[data-sent]').forEach(c => c.onchange = async () => { await post('/api/admin/order/sent', { orderKey: c.dataset.sent, sent: c.checked }); toast(c.checked ? 'סומן כנשלח ✓' : 'הסימון בוטל'); loadOrders(); });
+  document.querySelectorAll('[data-score]').forEach(b => b.onclick = () => scoreImage(b.dataset.score));
+  document.querySelectorAll('[data-morder]').forEach(b => b.onclick = () => openManual(b.dataset.morder));
+}
+$('refresh').onclick = async () => { await loadOrders(true); toast('עודכן ✓'); };
+
+/* create / edit game */
+function setLang(l) { LANG = l; document.querySelectorAll('#fLang button').forEach(b => b.classList.toggle('on', b.dataset.l === l)); }
+document.querySelectorAll('#fLang button').forEach(b => b.onclick = () => setLang(b.dataset.l));
+function openModal(id) { $(id).classList.remove('hidden'); }
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('.modal').classList.add('hidden'));
+document.querySelectorAll('.modal').forEach(m => m.onclick = e => { if (e.target === m) m.classList.add('hidden'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden')); });
+function step(n) { ['gStep1','gStep2','gStep3'].forEach((s, i) => $(s).classList.toggle('hidden', i + 1 !== n)); }
+function openCreate(key) {
+  CUR = { mode:'create', o: ORDERS.find(x => x.key === key) };
+  $('gFor').textContent = $('gFor2').textContent = `עבור ${CUR.o.name}`;
+  step(1); openModal('mGame');
+}
+$('cChanukah').onclick = () => {
+  const o = CUR.o;
+  $('gTitle').textContent = '🕎 משחק חנוכה'; $('gSave').textContent = 'צור משחק';
+  $('fTitle').value = o.name; $('fPlayers').value = o.players || 8; $('fDays').value = 30; $('fScore').checked = true; setLang('en');
+  $('daysWrap').classList.remove('hidden'); $('gErr').classList.add('hidden');
+  step(2); $('fTitle').focus();
+};
+function openEdit(key) {
+  const o = ORDERS.find(x => x.key === key), g = o.game;
+  CUR = { mode:'edit', o };
+  $('gTitle').textContent = '✏️ עריכת המשחק'; $('gSave').textContent = 'שמור שינויים';
+  $('gFor2').textContent = `עבור ${o.name} · הקישורים לא משתנים`;
+  $('fTitle').value = g.title || ''; $('fPlayers').value = g.max; $('fScore').checked = !!g.scoreTable; setLang(g.lang || 'en');
+  $('daysWrap').classList.add('hidden'); $('gErr').classList.add('hidden');
+  step(2); openModal('mGame');
+}
+$('gSave').onclick = async () => {
+  const body = { orderKey: CUR.o.key, title: $('fTitle').value.trim(), lang: LANG, players: $('fPlayers').value, days: $('fDays').value, scoreTable: $('fScore').checked };
+  if (!body.title) { $('gErr').textContent = 'צריך לכתוב שם'; $('gErr').classList.remove('hidden'); return; }
+  $('gSave').disabled = true;
+  const r = await post(CUR.mode === 'create' ? '/api/admin/order/game' : '/api/admin/order/edit-game', body).finally(() => { $('gSave').disabled = false; });
+  if (r.error) { $('gErr').textContent = r.error; $('gErr').classList.remove('hidden'); return; }
+  await loadOrders();
+  if (CUR.mode === 'edit') { $('mGame').classList.add('hidden'); toast('השינויים נשמרו ✓'); return; }
+  $('lReal').textContent = r.real; $('lDemo').textContent = r.demo; $('gFor3').textContent = `עבור ${CUR.o.name}`;
+  step(3);
+};
+document.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText($(b.dataset.copy).textContent));
+
+/* manual orders */
+$('addOrder').onclick = () => openManual(null);
+function openManual(key) {
+  const o = key ? ORDERS.find(x => x.key === key) : null;
+  CUR = { mode:'manual', id: key };
+  $('oTitle').textContent = o ? 'עריכת הזמנה ידנית' : 'הזמנה ידנית';
+  $('oName').value = o ? o.name : ''; $('oPhone').value = o ? o.phone : ''; $('oEmail').value = o ? o.email : '';
+  $('oPlayers').value = o ? o.players : 8; $('oNotes').value = o ? o.notes : '';
+  $('oDel').classList.toggle('hidden', !o); $('oErr').classList.add('hidden');
+  openModal('mOrder'); $('oName').focus();
+}
+$('oSave').onclick = async () => {
+  const r = await post('/api/admin/morder', { id: CUR.id, name: $('oName').value, phone: $('oPhone').value, email: $('oEmail').value, players: $('oPlayers').value, notes: $('oNotes').value });
+  if (r.error) { $('oErr').textContent = r.error; $('oErr').classList.remove('hidden'); return; }
+  $('mOrder').classList.add('hidden'); toast('ההזמנה נשמרה ✓'); loadOrders();
+};
+$('oDel').onclick = async () => {
+  if (!confirm('למחוק את ההזמנה? אם נוצר לה משחק, הקישורים ימשיכו לעבוד אבל ההזמנה תיעלם מהרשימה.')) return;
+  await post('/api/admin/morder/delete', { id: CUR.id }); $('mOrder').classList.add('hidden'); toast('נמחקה'); loadOrders();
+};
+
+/* all games */
+const gStatus = g => g.status === 'finished' ? 'played' : g.used ? 'created' : 'idle';
+const gName = g => g.status === 'finished' ? 'הסתיים' : g.used ? 'משחקים עכשיו' : g.status === 'lobby' ? 'בחדר ההמתנה' : 'עוד לא שוחק';
+async function loadGames() {
+  GAMES = await post('/api/admin/games');
+  if (!Array.isArray(GAMES)) return;
+  $('gRows').innerHTML = GAMES.map((g, i) => `<tr class="st-${gStatus(g)}">
+    <td><span class="status ${gStatus(g)}">${gName(g)}</span></td>
+    <td class="who"><b dir="auto">${esc(g.title || '—')}</b><span>${g.lang === 'he' ? 'עברית' : 'English'}</span></td>
+    <td class="num">${g.players}/${g.max}</td>
+    <td class="ord">${fmtDate(g.createdAt || g.startedAt)}</td>
+    <td><div class="acts">${g.links ? `<button class="btn sm" data-gl="${i}" data-w="real">🎮 העתק קישור משחק</button><button class="btn sm soft" data-gl="${i}" data-w="demo">🧪 העתק קישור תרגול</button>` : ''}
+      ${g.status === 'finished' && g.scoreTable ? `<button class="btn sm gold" data-score="${esc(g.id)}">📥 הורד ניקוד</button>` : ''}</div></td></tr>`).join('')
+    || '<tr><td colspan="5"><div class="empty"><b>עוד אין משחקים</b></div></td></tr>';
+  document.querySelectorAll('[data-gl]').forEach(b => b.onclick = () => copyText(GAMES[b.dataset.gl].links[b.dataset.w]));
+  document.querySelectorAll('#gRows [data-score]').forEach(b => b.onclick = () => scoreImage(b.dataset.score));
+}
+
+/* settings */
+async function loadSettings() {
+  const r = await post('/api/admin/settings');
+  $('sUrl').value = r.sheetUrl || ''; $('sKey').placeholder = r.hasKey ? '•••••• (שמור. השאירי ריק כדי לא לשנות)' : 'מופיע בראש הסקריפט';
+}
+$('sSave').onclick = async () => {
+  $('sSave').disabled = true;
+  const r = await post('/api/admin/settings', { save: true, sheetUrl: $('sUrl').value, sheetKey: $('sKey').value }).finally(() => { $('sSave').disabled = false; });
+  $('sNote').classList.remove('hidden');
+  $('sNote').className = 'note ' + (r.ok ? 'ok' : 'bad');
+  $('sNote').textContent = r.ok ? `✓ מחובר! נמצאו ${r.count} הזמנות של טריוויה.` : `לא הצלחתי להתחבר: ${r.error}`;
+  $('sKey').value = ''; loadOrders();
+};
+document.querySelectorAll('[data-prev]').forEach(b => b.onclick = async () => {
+  const w = window.open('', '_blank'); const r = await post('/api/admin/preview', { lang: b.dataset.prev });
+  if (r.link) w.location = r.link; else w.close();
+});
+$('ltStart').onclick = async () => {
   if (!confirm('להתחיל בדיקת עומס? זה מחייג שיחות אמיתיות ועולה כסף ב-Twilio.')) return;
   const r = await post('/api/admin/loadtest', { count: $('ltCount').value, games: $('ltGames').value });
   if (r.error) { alert(r.error); return; }
-  $('ltLinks').innerHTML = r.links.map((l, i) => `<div class="link"><b>משחק ${i + 1}:</b><code>${esc(l)}</code><button class="sm" onclick="window.open('${l}')">פתח</button></div>`).join('');
-  loadPoll();
-}
-async function loadStop() { await post('/api/admin/loadtest/stop', {}); loadPoll(); }
-async function loadPoll() {
-  const r = await post('/api/admin/loadtest/status', {});
+  $('ltLinks').innerHTML = r.links.map((l, i) => `<div class="link"><span class="ic">🎮</span><div><b>משחק ${i + 1}</b><code>${esc(l)}</code></div><button class="btn sm" onclick="window.open('${esc(l)}')">פתח</button></div>`).join('');
+  ltPoll();
+};
+$('ltStop').onclick = async () => { await post('/api/admin/loadtest/stop'); ltPoll(); };
+async function ltPoll() {
+  const r = await post('/api/admin/loadtest/status');
   if (!r.requested) return;
-  $('ltStatus').style.display = 'block';
-  $('ltStatus').textContent = `חויגו ${r.placed} מתוך ${r.requested} · מחוברים עכשיו: ${r.connected}` + (r.running ? ' · מחייג...' : '') + (r.errors ? `\nשגיאות: ${r.errors} (${r.lastError})` : '');
-  clearTimeout(loadPoll.t); loadPoll.t = setTimeout(loadPoll, 3000);
+  $('ltStatus').classList.remove('hidden');
+  $('ltStatus').textContent = `חויגו ${r.placed} מתוך ${r.requested} · מחוברים עכשיו: ${r.connected}` + (r.running ? ' · מחייג...' : '') + (r.errors ? ` · שגיאות: ${r.errors} (${r.lastError})` : '');
+  clearTimeout(ltPoll.t); ltPoll.t = setTimeout(ltPoll, 3000);
 }
-function copy(id, btn) { navigator.clipboard.writeText($(id).textContent); const t = btn.textContent; btn.textContent = 'הועתק ✓'; setTimeout(() => btn.textContent = t, 1500); }
-function open1(id) { window.open($(id).textContent); }
-const stName = g => g.status === 'finished' ? ['done','הסתיים'] : g.used ? ['play','משחקים עכשיו'] : g.status === 'lobby' ? ['new','בחדר ההמתנה'] : ['new','טרם התחיל'];
-async function load() {
-  if (!$('key').value) return;
-  const r = await post('/api/admin/games', {});
-  if (!Array.isArray(r)) { $('err').textContent = r.error || ''; return; }
-  $('games').innerHTML = r.map(g => { const [c, n] = stName(g);
-    return `<tr><td>${esc(g.title || '—')}</td><td>${g.connected}/${g.players || 0} (עד ${g.max})</td><td><span class="st ${c}">${n}</span></td><td>${g.startedAt ? new Date(g.startedAt).toLocaleString('he-IL') : ''}</td></tr>`; }).join('') || '<tr><td colspan="4">אין עדיין</td></tr>';
-}
-async function orders() {
-  if (!$('key').value) return;
-  const r = await post('/api/admin/orders', {});
-  if (!Array.isArray(r)) return;
-  $('orders').innerHTML = r.map(o => `<tr><td>${new Date(o.createdAt).toLocaleString('he-IL')}</td><td>${esc(o.name)}</td><td><a href="sms:${esc(o.phone)}">${esc(o.phone)}</a></td><td>${esc(o.pkg)}</td><td>${esc(o.night)}</td><td>${o.lang === 'he' ? 'עברית' : 'אנגלית'}</td><td>${esc([o.code && ('קוד ' + o.code), o.city, o.email, o.notes].filter(Boolean).join(' · '))}</td></tr>`).join('') || '<tr><td colspan="7">אין עדיין</td></tr>';
-}
-async function balance() {
-  if (!$('key').value) return;
-  const r = await post('/api/admin/balance', {});
+async function loadBalance() {
+  const r = await post('/api/admin/balance');
   if (r.balance == null) return;
-  const low = r.balance < 6;
-  $('balance').style.display = 'block';
-  $('balance').style.background = low ? '#fee2e2' : '#ecfdf5';
-  $('balance').textContent = `יתרה ב-Twilio: $${r.balance.toFixed(2)}` + (low ? ' · ⚠️ נמוכה! כדאי להטעין לפני המשחק הבא' : '');
+  const t = '$' + r.balance.toFixed(2), low = r.balance < 6;
+  $('bal').textContent = t + (low ? ' ⚠️' : ''); $('bal').classList.toggle('low', low);
+  $('bal2').textContent = t; $('bal2').style.color = low ? 'var(--red)' : 'var(--green)';
 }
-load(); balance(); orders(); setInterval(load, 5000); setInterval(orders, 30000); setInterval(balance, 60000);
+
+/* score picture */
+async function scoreImage(gameId) {
+  const r = await post('/api/admin/results', { gameId });
+  if (r.error) { toast(r.error); return; }
+  await document.fonts.ready;
+  const he = r.lang === 'he', list = r.ranking, W = 1080;
+  const H = Math.max(1080, 790 + list.length * 74 + 110);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#2a1a7a'); g.addColorStop(.45, '#170f45'); g.addColorStop(1, '#0d0828');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  const glow = x.createRadialGradient(W / 2, 0, 20, W / 2, 0, 700); glow.addColorStop(0, 'rgba(255,207,77,.35)'); glow.addColorStop(1, 'rgba(255,207,77,0)');
+  x.fillStyle = glow; x.fillRect(0, 0, W, 700);
+  const F = (w, s) => `${w} ${s}px Rubik, "Segoe UI", Arial, sans-serif`;
+  x.textAlign = 'center'; x.direction = he ? 'rtl' : 'ltr';
+  x.fillStyle = '#ffcf4d'; x.font = F(800, 30); x.fillText('TRICKY TRIVIA', W / 2, 84);
+  x.fillStyle = '#ffffff'; x.font = F(800, 74); x.fillText(he ? 'טבלת הניקוד' : 'Final Scores', W / 2, 178);
+  x.fillStyle = '#d8d0ff'; x.font = F(500, 34); x.fillText(r.title || '', W / 2, 234);
+  x.font = F(500, 24); x.fillStyle = '#a99fe0';
+  x.fillText(new Date(r.finishedAt || r.startedAt || Date.now()).toLocaleDateString(he ? 'he-IL' : 'en-US', { day:'numeric', month:'long', year:'numeric' }), W / 2, 274);
+  // podium: top 3, bars standing on one floor line
+  const floor = 690, cw = 280, gap = 320;
+  const pod = [[1, W / 2, 250, '#ffcf4d'], [2, W / 2 + (he ? gap : -gap), 200, '#dfe3ee'], [3, W / 2 + (he ? -gap : gap), 165, '#eaa56c']];
+  pod.forEach(([place, cx, h, col]) => {
+    const p = list[place - 1]; if (!p) return;
+    const y = floor - h;
+    const bar = x.createLinearGradient(0, y, 0, floor); bar.addColorStop(0, 'rgba(255,255,255,.16)'); bar.addColorStop(1, 'rgba(255,255,255,.04)');
+    x.fillStyle = bar; roundRect(x, cx - cw / 2, y, cw, h, 22); x.fill();
+    x.strokeStyle = col; x.lineWidth = 3; roundRect(x, cx - cw / 2, y, cw, h, 22); x.stroke();
+    x.textAlign = 'center';
+    x.font = F(800, place === 1 ? 70 : 58); x.fillText(['🥇', '🥈', '🥉'][place - 1], cx, y - 18);
+    x.fillStyle = '#fff'; x.font = F(800, place === 1 ? 38 : 32); x.fillText(fit(x, p.name, cw - 30), cx, y + 62);
+    x.fillStyle = col; x.font = F(800, place === 1 ? 32 : 27); x.fillText(`${p.score.toLocaleString()} ${he ? 'נק׳' : 'pts'}`, cx, y + 106);
+  });
+  // full table
+  const top = 790, rowH = 74, L = 80, R = W - 80;
+  const cRank = he ? W - 115 : 115, cName = he ? W - 170 : 170, cPts = he ? 330 : W - 330, cOk = he ? 150 : W - 150;
+  x.fillStyle = '#a99fe0'; x.font = F(700, 22);
+  x.textAlign = he ? 'right' : 'left'; x.fillText(he ? 'שם' : 'Name', cName, top - 18);
+  x.textAlign = 'center'; x.fillText(he ? 'נקודות' : 'Points', cPts, top - 18); x.fillText(he ? 'תשובות נכונות' : 'Correct', cOk, top - 18);
+  list.forEach((p, i) => {
+    const y = top + i * rowH, cy = y + rowH / 2 + 4;
+    x.fillStyle = i % 2 ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.09)'; roundRect(x, L - 20, y, R - L + 40, rowH - 10, 14); x.fill();
+    x.textAlign = 'center'; x.fillStyle = i < 3 ? '#ffcf4d' : '#d8d0ff'; x.font = F(800, 28); x.fillText(String(p.place), cRank, cy);
+    x.textAlign = he ? 'right' : 'left'; x.fillStyle = '#fff'; x.font = F(700, 29); x.fillText(fit(x, p.name, 420), cName, cy);
+    x.textAlign = 'center'; x.fillStyle = '#ffcf4d'; x.font = F(800, 29); x.fillText(p.score.toLocaleString(), cPts, cy);
+    x.fillStyle = '#d8d0ff'; x.font = F(500, 26); x.fillText(`${p.correct}/${r.questions}`, cOk, cy);
+  });
+  x.textAlign = 'center'; x.fillStyle = '#8c82c9'; x.font = F(500, 22); x.fillText(he ? '🕎 חנוכה שמח' : 'Happy Chanukah! 🕎', W / 2, H - 50);
+  const a = document.createElement('a'); a.download = `scores-${(r.title || 'game').replace(/[\\/:*?"<>|]/g, '')}.png`; a.href = c.toDataURL('image/png'); a.click();
+  toast('תמונת הניקוד ירדה ✓');
+}
+function roundRect(x, X, Y, w, h, r) { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); }
+function fit(x, t, max) { t = String(t); if (x.measureText(t).width <= max) return t; while (t.length > 1 && x.measureText(t + '…').width > max) t = t.slice(0, -1); return t + '…'; }
+
+/* start */
+async function boot() {
+  if (!KEY) return showLogin(false);
+  try { await loadOrders(); loadBalance(); } catch (e) { return; }
+  clearInterval(boot.t); boot.t = setInterval(() => { if (!document.querySelector('.modal:not(.hidden)')) loadOrders(); }, 30000);
+  setInterval(loadBalance, 120000);
+}
+boot();
 </script>
 </body>
 </html>

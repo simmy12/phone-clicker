@@ -23,7 +23,7 @@ async function api(path, body) {
 }
 async function act(a, extra = {}) { audio.unlock(); const r = await api('/api/game/' + a, extra); if (r.error) showErr(r); poll(); return r; }
 function showErr(r) {
-  const map = { tooMany: t('errTooMany', { max: r.max }), samePhone: t('errSamePhone'), phoneBusy: t('errPhoneBusy', { name: r.name }), noPlayers: t('errNoPlayers'), started: t('errStarted'), linkUsed: t('linkUsed') };
+  const map = { tooMany: t('errTooMany', { max: r.max }), samePhone: t('errSamePhone'), phoneBusy: t('errPhoneBusy', { name: r.name }), noPlayers: t('errNoPlayers'), started: t('errStarted'), linkUsed: t('linkUsed'), demoUsed: t('demoUsed') };
   $('setupErr').textContent = map[r.error] || r.error;
 }
 
@@ -203,7 +203,8 @@ const fx = (() => {
 })();
 
 // ---------- helpers ----------
-const gameTrack = () => 'game' + ((Math.floor(Math.max(0, S.qIndex) / Math.min(S.roundSize, 5)) % 4) + 1);
+const gameTrack = () => 'game' + (((S.roundSize < 100 ? (S.roundNo || 1) - 1 : Math.floor(Math.max(0, S.qIndex) / 5)) % 4) + 1);
+const qNum = () => S.qNo || S.qIndex + 1, qTot = () => S.qTotal || S.total;
 function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === 's-' + id)); }
 function flash() { const f = $('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
 function setBg(gold) {
@@ -255,14 +256,36 @@ function buildRows() {
   $('demoSteps').innerHTML = (L.demoSteps || []).map((s, i) => `<div><b>${i + 1}</b><span>${esc(s)}</span></div>`).join('');
 }
 $('mode').onchange = () => $('secWrap').classList.toggle('hidden', $('mode').value !== 'auto');
-$('toLobby').onclick = async () => {
+function readRows() {
   const names = [...document.querySelectorAll('#rows .nm')], phones = [...document.querySelectorAll('#rows .ph')];
-  const players = names.map((n, i) => ({ name: n.value.trim(), phone: phones[i].value.trim() })).filter(p => p.name || p.phone);
+  return names.map((n, i) => ({ name: n.value.trim(), phone: phones[i].value.trim() })).filter(p => p.name || p.phone);
+}
+// room for more players: empty boxes go to the top, the players already typed stay below
+$('roomAdd').onclick = () => {
+  $('roomBox').classList.add('hidden');
+  const players = readRows(), empty = S.max - players.length;
+  const order = [...Array(empty).fill({}), ...players];
+  $('rows').innerHTML = order.map((p, i) => `<div class="rrow${p.name ? '' : ' fresh'}"><span class="n">${i + 1}</span><input class="nm" placeholder="${t('name')}" value="${esc(p.name || '')}">
+    <input class="ph" placeholder="${t('phone')}" dir="ltr" value="${esc(p.phone || '')}"></div>`).join('');
+  $('rows').scrollTop = 0;
+  const first = document.querySelector('#rows .nm'); if (first) first.focus();
+};
+$('roomGo').onclick = () => { $('roomBox').classList.add('hidden'); goLobby(true); };
+$('toLobby').onclick = () => goLobby(false);
+async function goLobby(skipRoomCheck) {
+  const players = readRows();
   if (players.some(p => !p.name || !p.phone)) { $('setupErr').textContent = t('errNamePhone'); return; }
+  if (!skipRoomCheck && players.length > 0 && players.length < S.max) {
+    const left = S.max - players.length;
+    $('roomText').textContent = t('roomText', { max: S.max, n: players.length, left });
+    $('roomAdd').textContent = t('roomAdd', { left });
+    $('roomBox').classList.remove('hidden');
+    return;
+  }
   localStorage.setItem('roster-' + TOKEN, JSON.stringify(players));
   const r = await act('players', { players, mode: $('mode').value, seconds: $('seconds').value });
   if (!r.error) $('setupErr').textContent = '';
-};
+}
 $('editBtn').onclick = () => act('edit');
 $('startBtn').onclick = () => act('start');
 $('resumeBtn').onclick = () => act('resume');
@@ -297,7 +320,7 @@ async function health() {
 function render() {
   const s = S, key = [s.status, s.phase, s.qIndex].join('|'), changed = key !== prevKey;
   $('toolbar').classList.toggle('hidden', !['lobby', 'play'].includes(s.status));
-  $('tbInfo').textContent = s.status === 'play' ? t('questionOf', { n: s.qIndex + 1, total: s.total }) : '';
+  $('tbInfo').textContent = s.status === 'play' ? (s.question && s.question.poll ? t('poll') : t('questionOf', { n: s.qNo || s.qIndex + 1, total: s.qTotal || s.total })) : '';
   $('tbPause').classList.toggle('paused', !!s.paused);
   $('pausedOverlay').classList.toggle('hidden', !s.paused);
   $('pausedTitle').textContent = s.resumed ? t('resumeGame') : t('paused');
@@ -356,13 +379,14 @@ function fitText(el, maxW, maxSize) {   // shrink the text until it fits (fonts 
 }
 
 function renderIntro() {
-  const q = S.question, bonus = q && q.bonus;
+  const q = S.question, bonus = q && q.bonus, poll = q && q.poll;
+  clearTimeout(showRoundCards.a); clearTimeout(showRoundCards.b); $('sideCards').className = 'out';   // round cards belong to the previous question
   show('intro'); flash(); push(); $('s-intro').classList.toggle('bonus', !!bonus);
   audio.play(gameTrack()); audio.sfx(bonus ? 'bonus' : 'whoosh');
   if (S.qIndex === 0 && !bonus && (S.remainingMs || 0) > 4000) return countdown321();
-  $('introTxt').textContent = bonus ? t('bonus') : t('question', { n: S.qIndex + 1 });
+  $('introTxt').textContent = bonus ? t('bonus') : poll ? t('poll') : t('question', { n: qNum() });
   $('introTxt').style.whiteSpace = 'nowrap'; fitText($('introTxt'), 1700, 230);
-  $('introSub').textContent = bonus ? t('bonusSub') : ((S.qIndex % S.roundSize === 0 && S.roundSize < 100) ? t('roundOf', { n: Math.floor(S.qIndex / S.roundSize) + 1 }) : '');
+  $('introSub').textContent = bonus ? t('bonusSub') : poll ? t('pollSub') : (S.roundStart ? t('roundOf', { n: S.roundNo }) : '');
   $('introBonusImg').classList.toggle('hidden', !bonus);
   if (bonus) { $('introBonusImg').src = `themes/${S.theme.id}/${S.theme.bonusImage}`; fx.show(3, 350); }
   // preload the memory image so it shows instantly
@@ -397,8 +421,8 @@ function renderQuestion(changed) {
   if (changed) {
     show('quiz'); audio.play(gameTrack());
     const sq = $('s-quiz'); sq.classList.remove('enter'); void sq.offsetWidth; sq.classList.add('enter');
-    $('qBadge').textContent = (q.bonus ? '⭐ ' + t('bonus') + ' ⭐ · ' : '') + t('questionOf', { n: S.qIndex + 1, total: S.total });
-    $('qBadge').classList.toggle('bonus', q.bonus);
+    $('qBadge').textContent = q.poll ? '📊 ' + t('poll') : (q.bonus ? '⭐ ' + t('bonus') + ' ⭐ · ' : '') + t('questionOf', { n: qNum(), total: qTot() });
+    $('qBadge').classList.toggle('bonus', q.bonus); $('qBadge').classList.toggle('poll', !!q.poll);
     $('qText').textContent = q.text;
     $('tiles').classList.remove('reveal');
     $('tiles').innerHTML = q.options.map((o, i) => `<div class="tile t${i + 1} flip" style="animation-delay:${.35 + i * .22}s"><div class="meter"></div><div class="k">${i + 1}</div><div class="tx${o.length > 16 ? ' long' : ''}">${esc(o)}</div><div class="pct"></div></div>`).join('');
@@ -439,7 +463,7 @@ function renderReveal() {
   setTimeout(() => {
     flash(); audio.sfx('reveal');
     const tiles = [...document.querySelectorAll('#tiles .tile')];
-    tiles.forEach((el, i) => { el.classList.remove('flip'); el.classList.add(q.correct === i + 1 ? 'win' : 'dim'); });
+    tiles.forEach((el, i) => { el.classList.remove('flip'); if (!q.poll) el.classList.add(q.correct === i + 1 ? 'win' : 'dim'); });
     // coins fly from the jar into the answer meters
     const stage = $('stage'), jr = $('jar').getBoundingClientRect(), sr = stage.getBoundingClientRect(), k = sr.width / 1920;
     let n = 0;
@@ -479,9 +503,9 @@ function showRoundCards(rs, delay) {
   const box = $('sideCards');
   box.innerHTML = `<div class="side-card smart"><img src="themes/base/badge-smart.webp" alt=""><div><h4>${t('roundSmart')}</h4><b>${esc(rs.smart.name)}</b><span>${t('correctOf', { n: rs.smart.correct })}</span></div></div>
     <div class="side-card fast"><img src="themes/base/badge-fast.webp" alt=""><div><h4>${t('roundFast')}</h4><b>${esc(rs.fast.name)}</b><span>${t('avgSec', { s: rs.fast.avg })}</span></div></div>`;
-  box.className = '';
-  setTimeout(() => { box.className = 'in'; audio.sfx('bonus'); }, delay);
-  setTimeout(() => { box.className = 'out'; }, delay + 5200);
+  box.className = ''; clearTimeout(showRoundCards.a); clearTimeout(showRoundCards.b);
+  showRoundCards.a = setTimeout(() => { box.className = 'in'; audio.sfx('bonus'); }, delay);
+  showRoundCards.b = setTimeout(() => { box.className = 'out'; }, delay + 5200);
 }
 
 function renderBoard() {
@@ -489,7 +513,7 @@ function renderBoard() {
   show('board'); audio.play('final'); flash(); push();
   setTimeout(() => audio.say('announce-leaders', t('leaders')), 500);
   const r = S.ranking.slice(0, 5), H = 124, trophy = ['trophy-gold', 'trophy-silver', 'trophy-bronze'];
-  const prev = (S.prevRanking || []).map(p => p.name), first = S.qIndex + 1 <= S.roundSize;
+  const prev = (S.prevRanking || []).map(p => p.name), first = (S.roundNo || 1) === 1;
   const prevScore = n => (S.prevRanking.find(x => x.name === n) || {}).score || 0;
   $('boardRows').innerHTML = r.map((p, i) => {
     let from = prev.indexOf(p.name); if (from < 0 || from > 5) from = 5;
@@ -553,7 +577,9 @@ function renderFinal() {
     if (n === 1) { audio.sfx('applause'); fx.show(10, 380); fx.confetti(300); } else audio.sfx('reveal');
   }, at));
   $('finalFoot').innerHTML = S.kind === 'demo'
-    ? `${esc(t('demoDone'))}<br><button class="btn gold" id="againBtn">${esc(t('demoAgain'))}</button>`
+    ? (S.playsLeft > 0
+      ? `${esc(t('demoDone'))}<br><button class="btn gold" id="againBtn">${esc(t('demoAgain'))}</button><div class="plays-left">${esc(t('demoLeft', { n: S.playsLeft }))}</div>`
+      : `${esc(t('demoDone'))}<br><span class="plays-left">${esc(t('demoNoMore'))}</span>`)
     : esc(t('finalSub'));
   const ab = $('againBtn'); if (ab) ab.onclick = () => act('again');
 }

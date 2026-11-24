@@ -559,3 +559,15 @@ input, select { font-family:"Rubik"; font-weight:600; border:2px solid rgba(255,
 
 /* v8: answers never cut */
 .tile .tx { overflow-wrap:anywhere; max-height:132px; }
+
+/* v9: room for more players + practice plays left */
+#roomBox { position:absolute; inset:0; z-index:85; display:grid; place-items:center; background:rgba(5,3,25,.75); backdrop-filter:blur(6px); }
+.room-icon { font-size:84px; margin-bottom:6px; animation:pop .5s; }
+#roomBox .btn.gold { font-size:32px; padding:18px 42px; border-radius:80px; }
+#roomBox .btn.ghost { font-size:28px; padding:18px 38px; border-radius:80px; }
+.rrow.fresh input { border-color:rgba(255,207,77,.85); box-shadow:0 0 0 3px rgba(255,207,77,.25); animation:freshPulse 1.6s ease-in-out 2; }
+@keyframes freshPulse { 50% { box-shadow:0 0 0 7px rgba(255,207,77,.12); } }
+.plays-left { display:block; margin-top:12px; font-size:24px; font-weight:700; color:#e4dcff; }
+@media (prefers-reduced-motion:reduce) { .rrow.fresh input, .room-icon { animation:none; } }
+/* v10: poll questions */
+.q-badge.poll { background:linear-gradient(180deg,#a5f3fc,#22d3ee 55%,#0e7490); color:#062a33; text-shadow:0 2px 0 rgba(255,255,255,.45); }
