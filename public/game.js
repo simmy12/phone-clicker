@@ -207,10 +207,11 @@ const gameTrack = () => 'game' + (((S.roundSize < 100 ? (S.roundNo || 1) - 1 : M
 const qNum = () => S.qNo || S.qIndex + 1, qTot = () => S.qTotal || S.total;
 function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === 's-' + id)); }
 function flash() { const f = $('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
+const imgSrc = f => f.startsWith('/') ? f : `themes/${S.theme.id}/${f}`;
 function setBg(gold) {
-  const th = S.theme.id;
-  $('bg').style.backgroundImage = `url(themes/${th}/bg-main.webp)`;
-  $('bg2').style.backgroundImage = `url(themes/${th}/bg-gold.webp)`;
+  const dir = S.theme.bgDir || `themes/${S.theme.id}`;
+  $('bg').style.backgroundImage = `url(${dir}/bg-main.webp)`;
+  $('bg2').style.backgroundImage = `url(${dir}/bg-gold.webp)`;
   $('bg2').style.opacity = gold ? 1 : 0;
 }
 function push() { const st = $('stage'); st.classList.add('push'); clearTimeout(push.t); push.t = setTimeout(() => st.classList.remove('push'), 1300); }
@@ -218,12 +219,13 @@ let decorDone = false;
 function decor() {
   if (decorDone || !S.theme.decor) return; decorDone = true;
   const spots = [[60, 40, 150, -12], [1720, 60, 160, 10], [40, 860, 150, 8], [1740, 880, 130, -8]];
-  $('decor').innerHTML = S.theme.decor.map((f, i) => { const [l, tp, w, r] = spots[i % 4];
-    return `<img src="themes/${S.theme.id}/${f}" style="left:${l}px;top:${tp}px;width:${w}px;--r:${r}deg;animation-delay:${-i * 1.5}s" alt="">`; }).join('');
+  $('decor').innerHTML = S.theme.decor.map((f, i) => { let [l, tp, w, r] = spots[i % 4];
+    if (f.startsWith('/pimg/')) { r = 0; if (i === 0) tp = 120; }   // uploaded logos: upright, and clear of the host toolbar
+    return `<img src="${f.includes('/') ? f : `themes/${S.theme.id}/${f}`}" style="left:${l}px;top:${tp}px;width:${w}px;--r:${r}deg;animation-delay:${-i * 1.5}s" alt="">`; }).join('');
 }
 function preload() {
   if (preload.done) return; preload.done = true;
-  const th = S.theme.id, imgs = ['bg-main', 'bg-gold'].map(n => `themes/${th}/${n}.webp`)
+  const dir = S.theme.bgDir || `themes/${S.theme.id}`, imgs = ['bg-main', 'bg-gold'].map(n => `${dir}/${n}.webp`)
     .concat(['trophy-gold','trophy-silver','trophy-bronze','badge-fast','badge-smart','podium','coin'].map(n => `themes/base/${n}.webp`));
   imgs.forEach(src => { const i = new Image(); i.src = src; });
   audio.preload(['applause', 'game1', 'final', 'announce-leaders', 'announce-winners']);
@@ -390,7 +392,7 @@ function renderIntro() {
   $('introBonusImg').classList.toggle('hidden', !bonus);
   if (bonus) { $('introBonusImg').src = `themes/${S.theme.id}/${S.theme.bonusImage}`; fx.show(3, 350); }
   // preload the memory image so it shows instantly
-  if (q && q.image) { const i = new Image(); i.src = `themes/${S.theme.id}/${q.image}`; }
+  if (q && q.image) { const i = new Image(); i.src = imgSrc(q.image); }
 }
 
 function countdown321() {
@@ -409,7 +411,7 @@ function countdown321() {
 
 function renderMemory() {
   show('memory'); audio.play(gameTrack()); audio.sfx('whoosh');
-  $('memImg').src = `themes/${S.theme.id}/${S.question.image}`;
+  $('memImg').src = imgSrc(S.question.image);
   const bar = $('memBar'), left = S.remainingMs || 8000;
   bar.style.transition = 'none'; bar.style.width = '100%';
   requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = `width ${left}ms linear`; bar.style.width = '0%'; }));

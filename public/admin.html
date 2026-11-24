@@ -93,7 +93,7 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
 .note.ok { background:var(--green-bg); color:#13633a; } .note.bad { background:var(--red-bg); color:#a1222f; } .note.info { background:var(--violet-2); color:#3d2a9a; }
 
 /* modal */
-.modal { position:fixed; inset:0; background:rgba(20,14,48,.55); display:grid; place-items:center; z-index:50; padding:20px; }
+.modal { position:fixed; inset:0; background:rgba(20,14,48,.55); display:grid; place-items:center; z-index:70; padding:20px; }
 .modal.hidden, .hidden { display:none !important; }
 .box { background:#fff; border-radius:18px; width:min(560px, 100%); max-height:92vh; overflow:auto; padding:26px 28px; box-shadow:0 30px 80px rgba(0,0,0,.35); }
 .box h2 { margin:0 0 4px; font-size:22px; }
@@ -124,6 +124,60 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
 .login .box { width:min(380px, 92vw); text-align:center; }
 .login .box .big { font-size:26px; margin-bottom:4px; }
 
+/* editor */
+.ed { position:fixed; inset:0; background:var(--bg); z-index:60; display:flex; flex-direction:column; }
+.ed-top { background:#fff; border-bottom:1px solid var(--line); padding:14px 26px; display:flex; align-items:center; gap:14px; }
+.ed-top h2 { margin:0; font-size:21px; } .ed-top .sub { color:var(--muted); font-size:14px; }
+.ed-body { flex:1; overflow:auto; padding:20px 26px 30px; }
+.ed-foot { background:#fff; border-top:1px solid var(--line); padding:12px 26px; display:flex; align-items:center; gap:12px; }
+.ed-foot .note { margin:0; }
+.panel { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:16px; }
+.panel h3 { margin:0 0 10px; font-size:15px; }
+.settings-row { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:14px; align-items:end; }
+.settings-row label.f { margin-top:0; }
+.look { display:grid; grid-template-columns:auto 1fr; gap:24px; align-items:start; }
+.bgopts { display:flex; gap:10px; }
+.bgopt { border:2px solid var(--line); border-radius:12px; padding:6px; background:#fff; text-align:center; font-weight:700; font-size:13px; }
+.bgopt img { display:block; width:150px; height:84px; object-fit:cover; border-radius:8px; margin-bottom:5px; }
+.bgopt.on { border-color:var(--violet); box-shadow:0 0 0 3px #e1d8ff; }
+.objs { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; direction:ltr; }
+.obj { border:1px solid var(--line); border-radius:12px; padding:8px; text-align:center; font-size:12.5px; color:var(--muted); }
+.obj .th { height:64px; display:grid; place-items:center; background:repeating-conic-gradient(#f3f1fa 0 25%, #fff 0 50%) 0 0/14px 14px; border-radius:8px; margin-bottom:6px; }
+.obj .th img { max-width:90%; max-height:58px; }
+.obj .row { justify-content:center; gap:6px; margin-top:6px; }
+.qtools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+.qtools .cnt { color:var(--muted); font-size:14px; margin-inline-start:6px; }
+.qt { width:100%; border-collapse:separate; border-spacing:0; background:#fff; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+.qt th { position:sticky; top:0; z-index:2; }
+.qt td { vertical-align:top; padding:10px 10px; }
+.qt tr.round-sep td { background:#f7f4ff; color:var(--violet); font-weight:800; font-size:13px; padding:6px 14px; }
+.qt .n { font-weight:800; color:var(--muted); text-align:center; width:34px; padding-top:18px; }
+.qt select.in { padding:8px; font-size:14px; min-width:96px; }
+.qt textarea.in { min-height:44px; resize:vertical; font-size:15px; line-height:1.35; }
+.ans { display:grid; grid-template-columns:1fr 1fr; gap:6px; min-width:340px; }
+.ansb { display:flex; align-items:center; gap:6px; border:1px solid #d9d5ec; border-radius:10px; padding:3px 8px 3px 4px; background:#fff; }
+.ansb.ok { border-color:var(--green); background:var(--green-bg); }
+.ansb input[type=text] { border:0; outline:0; flex:1; min-width:0; padding:6px 2px; font-size:14px; background:transparent; }
+.ansb .k { width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:800; color:#fff; flex-shrink:0; }
+.ansb .ck { width:26px; height:26px; border-radius:50%; border:2px solid #cfcae6; background:#fff; color:transparent; font-weight:900; font-size:13px; padding:0; flex-shrink:0; }
+.ansb.ok .ck { background:var(--green); border-color:var(--green); color:#fff; }
+.poll .ck { visibility:hidden; }
+.k1 { background:#0ea5e9; } .k2 { background:#c026d3; } .k3 { background:#f59e0b; } .k4 { background:#16a34a; }
+.qimg { display:flex; gap:8px; align-items:center; margin-top:8px; font-size:13px; color:var(--muted); }
+.qimg img { width:76px; height:48px; object-fit:cover; border-radius:6px; border:1px solid var(--line); }
+.tag { display:inline-block; font-size:11.5px; font-weight:800; border-radius:6px; padding:2px 7px; margin-top:6px; }
+.tag.poll { background:#e0f7fb; color:#0e7490; } .tag.bonus { background:var(--gold-2); color:#8a5a00; } .tag.image { background:var(--violet-2); color:var(--violet); }
+.rowacts { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.ib { border:1px solid var(--line); background:#fff; border-radius:8px; width:32px; height:30px; font-size:14px; padding:0; }
+.ib:hover { background:#f5f3ff; }
+.ib.del:hover { background:var(--red-bg); }
+.sw { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--muted); white-space:nowrap; margin-top:12px; cursor:pointer; }
+.sw input { accent-color:var(--violet); width:16px; height:16px; }
+.tpls { display:grid; gap:8px; margin-top:10px; }
+.tpl { display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:12px; padding:10px 14px; text-align:right; background:#fff; width:100%; }
+.tpl:hover { border-color:var(--violet); background:#faf8ff; }
+.tpl b { flex:1; } .tpl span { color:var(--muted); font-size:13px; }
+
 @media (max-width:900px) {
   .app { grid-template-columns:1fr; }
   .side { position:static; height:auto; flex-direction:row; flex-wrap:wrap; padding:12px; }
@@ -151,6 +205,7 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
     <div class="brand">Tricky Trivia<small>מערכת ניהול</small></div>
     <button class="nav on" data-v="orders">🛒 הזמנות <span class="n hidden" id="nNew"></span></button>
     <button class="nav" data-v="games">🎮 כל המשחקים</button>
+    <button class="nav" data-v="templates">⭐ תבניות</button>
     <button class="nav" data-v="settings">⚙️ הגדרות</button>
     <div class="foot">יתרה ב-Twilio<b id="bal">—</b></div>
   </aside>
@@ -183,6 +238,12 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
           <tbody id="gRows"></tbody>
         </table>
       </div>
+    </section>
+
+    <!-- templates -->
+    <section id="v-templates" class="hidden">
+      <div class="head"><h1>תבניות</h1><span class="sync">משחקים אישיים ששמרת, לשימוש חוזר. בוחרים אותם ב"צור משחק" ← "התאמה אישית"</span></div>
+      <div class="tbl"><table><thead><tr><th>שם התבנית</th><th style="text-align:center">שאלות</th><th>עודכן</th><th>פעולות</th></tr></thead><tbody id="tRows"></tbody></table></div>
     </section>
 
     <!-- settings -->
@@ -233,9 +294,15 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
       <div class="sub" id="gFor"></div>
       <div class="concepts">
         <button class="concept" id="cChanukah"><span class="ic">🕎</span><b>משחק חנוכה</b><span>המשחק המוכן, עם כל שאלות החנוכה</span></button>
-        <button class="concept" disabled><span class="ic">✏️</span><b>התאמה אישית</b><span>לשנות שאלות, סדר, רקע ואובייקטים</span><br><i class="soon">בקרוב</i></button>
+        <button class="concept" id="cCustom"><span class="ic">✏️</span><b>התאמה אישית</b><span>לשנות שאלות, סדר, רקע ואובייקטים</span></button>
       </div>
       <div class="foot-btns"><button class="btn ghost" data-close>ביטול</button></div>
+    </div>
+    <div id="gStepC" class="hidden">
+      <h2>✏️ מאיפה מתחילים?</h2>
+      <div class="sub">אפשר לשנות הכל אחר כך</div>
+      <div class="tpls" id="startList"></div>
+      <div class="foot-btns"><button class="btn ghost" id="cBack">חזרה</button></div>
     </div>
     <div id="gStep2" class="hidden">
       <h2 id="gTitle">🕎 משחק חנוכה</h2>
@@ -258,6 +325,71 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
       <div class="link"><span class="ic">🧪</span><div><b>קישור תרגול</b><code id="lDemo"></code></div><button class="btn sm soft" data-copy="lDemo">העתק</button></div>
       <div class="foot-btns"><button class="btn ghost" data-close>סגור</button></div>
     </div>
+  </div>
+</div>
+
+<!-- question editor -->
+<div class="ed hidden" id="ed">
+  <div class="ed-top">
+    <div><h2 id="edTitle">✏️ משחק בהתאמה אישית</h2><div class="sub" id="edFor"></div></div>
+    <span class="spacer"></span>
+    <button class="btn ghost" id="edClose">✕ סגור</button>
+  </div>
+  <div class="ed-body">
+    <div class="panel" id="edGame">
+      <h3>פרטי המשחק</h3>
+      <div class="settings-row">
+        <div><label class="f">השם שיופיע על המסך</label><input class="in" id="eTitle" maxlength="60"></div>
+        <div><label class="f">שפת המסכים</label><div class="seg" id="eLang"><button data-l="en">English</button><button data-l="he">עברית</button></div></div>
+        <div><label class="f">מספר משתתפים</label><input class="in" id="ePlayers" type="number" min="1" max="100"></div>
+        <div id="eDaysWrap"><label class="f">תוקף (ימים)</label><input class="in" id="eDays" type="number" value="30" min="1" max="365"></div>
+      </div>
+      <label class="check" style="max-width:420px"><input type="checkbox" id="eScore" checked><span><b>שמור טבלת ניקוד</b><small>בסוף המשחק תופיע תמונה של הניקוד להורדה</small></span></label>
+    </div>
+    <div class="panel">
+      <h3>עיצוב</h3>
+      <div class="look">
+        <div><label class="f" style="margin-top:0">רקע</label>
+          <div class="bgopts">
+            <button class="bgopt" data-bg="chanukah"><img src="/themes/hanukkah/bg-main.webp" alt="">חנוכה</button>
+            <button class="bgopt" data-bg="plain"><img src="/themes/base/bg-main.webp" alt="">רגיל</button>
+          </div></div>
+        <div><label class="f" style="margin-top:0">4 האובייקטים בפינות</label><div class="objs" id="objs"></div></div>
+      </div>
+    </div>
+    <div class="qtools">
+      <button class="btn" id="qAdd">+ שאלה</button>
+      <button class="btn soft" id="qPaste">📋 הדבק מאקסל</button>
+      <button class="btn soft" id="qCopy">📤 העתק לאקסל</button>
+      <span class="cnt" id="qCount"></span>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="qTpl">⭐ שמור כתבנית</button>
+    </div>
+    <table class="qt">
+      <thead><tr><th>#</th><th>סוג</th><th>שאלה</th><th>תשובות <span style="font-weight:500">(לחיצה על העיגול = התשובה הנכונה)</span></th><th>פעולות</th></tr></thead>
+      <tbody id="qRows"></tbody>
+    </table>
+  </div>
+  <div class="ed-foot">
+    <button class="btn" id="edSave">צור משחק</button>
+    <div class="note bad hidden" id="edErr"></div>
+    <span class="spacer"></span>
+    <span class="sync" id="edSaved"></span>
+  </div>
+</div>
+
+<!-- paste from excel -->
+<div class="modal hidden" id="mPaste">
+  <div class="box" style="width:min(680px,100%)">
+    <h2>📋 הדבקה מאקסל</h2>
+    <div class="sub">מעתיקים שורות מאקסל ומדביקים כאן. בכל שורה, לפי הסדר:<br><b>שאלה · תשובה 1 · תשובה 2 · תשובה 3 · תשובה 4 · מספר התשובה הנכונה · סוג</b> (רשות: רגילה / סקר / בונוס)</div>
+    <textarea class="in" id="pasteBox" rows="8" dir="auto" placeholder="מדביקים כאן (Ctrl+V)"></textarea>
+    <div class="row" style="margin-top:10px">
+      <label class="sw" style="margin:0"><input type="radio" name="pm" value="add" checked> להוסיף בסוף</label>
+      <label class="sw" style="margin:0"><input type="radio" name="pm" value="replace"> להחליף את כל השאלות</label>
+    </div>
+    <div class="note bad hidden" id="pasteErr"></div>
+    <div class="foot-btns"><button class="btn" id="pasteGo">הוסף שאלות</button><button class="btn ghost" data-close>ביטול</button></div>
   </div>
 </div>
 
@@ -306,8 +438,8 @@ $('pw').onkeydown = e => { if (e.key === 'Enter') $('pwGo').click(); };
 document.querySelectorAll('.nav').forEach(b => b.onclick = () => view(b.dataset.v));
 function view(v) {
   document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.v === v));
-  ['orders','games','settings'].forEach(x => $('v-' + x).classList.toggle('hidden', x !== v));
-  if (v === 'games') loadGames(); if (v === 'settings') loadSettings();
+  ['orders','games','templates','settings'].forEach(x => $('v-' + x).classList.toggle('hidden', x !== v));
+  if (v === 'games') loadGames(); if (v === 'settings') loadSettings(); if (v === 'templates') loadTemplates();
 }
 
 /* orders */
@@ -368,7 +500,7 @@ function openModal(id) { $(id).classList.remove('hidden'); }
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('.modal').classList.add('hidden'));
 document.querySelectorAll('.modal').forEach(m => m.onclick = e => { if (e.target === m) m.classList.add('hidden'); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden')); });
-function step(n) { ['gStep1','gStep2','gStep3'].forEach((s, i) => $(s).classList.toggle('hidden', i + 1 !== n)); }
+function step(n) { ['gStep1','gStep2','gStep3','gStepC'].forEach((s, i) => $(s).classList.toggle('hidden', [1, 2, 3, 'c'][i] !== n)); }
 function openCreate(key) {
   CUR = { mode:'create', o: ORDERS.find(x => x.key === key) };
   $('gFor').textContent = $('gFor2').textContent = `עבור ${CUR.o.name}`;
@@ -383,6 +515,7 @@ $('cChanukah').onclick = () => {
 };
 function openEdit(key) {
   const o = ORDERS.find(x => x.key === key), g = o.game;
+  if (g.pack) return openEditor({ mode:'editGame', o, packId: g.pack });
   CUR = { mode:'edit', o };
   $('gTitle').textContent = '✏️ עריכת המשחק'; $('gSave').textContent = 'שמור שינויים';
   $('gFor2').textContent = `עבור ${o.name} · הקישורים לא משתנים`;
@@ -402,6 +535,189 @@ $('gSave').onclick = async () => {
   step(3);
 };
 document.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText($(b.dataset.copy).textContent));
+
+
+/* ---------- custom games: question editor ---------- */
+const TYPES = [['regular','רגילה'], ['image','תמונה'], ['poll','סקר'], ['bonus','בונוס']];
+const SLOTS = ['למעלה משמאל', 'למעלה מימין', 'למטה משמאל', 'למטה מימין'];
+const DEF_DECOR = ['dreidel', 'donut', 'oil', 'coins'].map(n => `/themes/hanukkah/${n}.webp`);
+let ED = null, EDL = 'en';
+$('cCustom').onclick = async () => {
+  const t = await post('/api/admin/pack/templates');
+  $('startList').innerHTML = `<button class="tpl" data-from="chanukah" data-lang="en"><span>🕎</span><b>שאלות החנוכה באנגלית</b><span>28 שאלות</span></button>
+    <button class="tpl" data-from="chanukah" data-lang="he"><span>🕎</span><b>שאלות החנוכה בעברית</b><span>28 שאלות</span></button>`
+    + (Array.isArray(t) ? t : []).map(x => `<button class="tpl" data-from="${esc(x.id)}" data-lang="${x.lang}"><span>⭐</span><b>${esc(x.name)}</b><span>${x.count} שאלות · תבנית</span></button>`).join('');
+  document.querySelectorAll('#startList [data-from]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    const pk = await post('/api/admin/pack/new', { lang: b.dataset.lang, from: b.dataset.from });
+    b.disabled = false;
+    if (pk.error) return toast(pk.error);
+    $('mGame').classList.add('hidden');
+    openEditor({ mode:'create', o: CUR.o, pack: pk });
+  });
+  step('c');
+};
+$('cBack').onclick = () => step(1);
+function setELang(l) { EDL = l; document.querySelectorAll('#eLang button').forEach(b => b.classList.toggle('on', b.dataset.l === l)); }
+document.querySelectorAll('#eLang button').forEach(b => b.onclick = () => setELang(b.dataset.l));
+
+async function openEditor({ mode, o, pack, packId }) {
+  if (!pack) { pack = await post('/api/admin/pack/get', { id: packId }); if (pack.error) return toast(pack.error); }
+  ED = { mode, o, pack };
+  $('edErr').classList.add('hidden'); $('edSaved').textContent = '';
+  $('edGame').classList.toggle('hidden', mode === 'template');
+  $('qTpl').classList.toggle('hidden', mode === 'template');
+  $('edTitle').textContent = mode === 'template' ? `⭐ תבנית: ${pack.name}` : mode === 'editGame' ? '✏️ עריכת משחק אישי' : '✏️ משחק בהתאמה אישית';
+  $('edFor').textContent = o ? `עבור ${o.name}` + (mode === 'editGame' ? ' · הקישורים לא משתנים' : '') : 'שינויים נשמרים לבד';
+  $('edSave').textContent = mode === 'create' ? 'צור משחק' : 'שמור';
+  if (mode === 'create') { $('eTitle').value = o.name; $('ePlayers').value = o.players || 8; $('eDays').value = 30; $('eScore').checked = true; setELang(pack.lang || 'en'); }
+  if (mode === 'editGame') { const g = o.game; $('eTitle').value = g.title || ''; $('ePlayers').value = g.max; $('eScore').checked = !!g.scoreTable; setELang(g.lang || 'en'); }
+  $('eDaysWrap').classList.toggle('hidden', mode !== 'create');
+  renderLook(); renderQs();
+  $('ed').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+}
+$('edClose').onclick = () => { const tpl = ED && ED.mode === 'template'; flushSave(); $('ed').classList.add('hidden'); document.body.style.overflow = ''; ED = null; loadOrders(); if (tpl) loadTemplates(); };
+
+function renderLook() {
+  document.querySelectorAll('.bgopt').forEach(b => { b.classList.toggle('on', b.dataset.bg === (ED.pack.bg || 'chanukah')); b.onclick = () => { ED.pack.bg = b.dataset.bg; renderLook(); autosave(); }; });
+  $('objs').innerHTML = SLOTS.map((name, i) => { const cur = ED.pack.decor[i];
+    return `<div class="obj"><div class="th"><img src="${esc(cur || DEF_DECOR[i])}" alt=""></div>${name}
+      <div class="row"><label class="btn sm soft" style="cursor:pointer">החלף<input type="file" accept="image/*" data-obj="${i}" hidden></label>${cur ? `<button class="btn sm ghost" data-objreset="${i}">מקורי</button>` : ''}</div></div>`; }).join('');
+  document.querySelectorAll('[data-obj]').forEach(inp => inp.onchange = async () => {
+    const url = await uploadImg(inp.files[0], 500, true); if (!url) return;
+    ED.pack.decor[+inp.dataset.obj] = url; renderLook(); autosave();
+  });
+  document.querySelectorAll('[data-objreset]').forEach(b => b.onclick = () => { ED.pack.decor[+b.dataset.objreset] = null; renderLook(); autosave(); });
+}
+
+function renderQs() {
+  const qs = ED.pack.questions; let round = 0;
+  $('qCount').textContent = `${qs.length} שאלות · ${qs.filter(q => q.type === 'poll').length} סקרים`;
+  $('qRows').innerHTML = qs.map((q, i) => {
+    let sep = '';
+    if (i === 0 || q.newRound) { round++; sep = `<tr class="round-sep"><td colspan="5">סבב ${round}</td></tr>`; }
+    const poll = q.type === 'poll';
+    return sep + `<tr data-i="${i}">
+      <td class="n">${i + 1}</td>
+      <td><select class="in" data-f="type">${TYPES.map(([v, t]) => `<option value="${v}"${q.type === v ? ' selected' : ''}>${t}</option>`).join('')}</select>
+        ${q.type !== 'regular' ? `<div class="tag ${q.type}">${poll ? '📊 בלי נקודות' : q.type === 'bonus' ? '⭐ ניקוד כפול' : '🖼️ תמונה קודם'}</div>` : ''}</td>
+      <td style="min-width:260px"><textarea class="in" data-f="text" dir="auto" rows="2" placeholder="כתבי את השאלה">${esc(q.text)}</textarea>
+        ${q.type === 'image' ? `<div class="qimg">${q.image ? `<img src="${esc(q.image)}" alt="">` : 'אין עדיין תמונה'}<label class="btn sm soft" style="cursor:pointer">${q.image ? 'החלף תמונה' : 'העלה תמונה'}<input type="file" accept="image/*" data-qimg hidden></label></div>` : ''}
+        ${i > 0 ? `<label class="sw"><input type="checkbox" data-f="newRound"${q.newRound ? ' checked' : ''}> סבב חדש מתחיל כאן</label>` : ''}</td>
+      <td><div class="ans${poll ? ' poll' : ''}">${[0, 1, 2, 3].map(k => `<div class="ansb${!poll && q.correct === k + 1 ? ' ok' : ''}"><span class="k k${k + 1}">${k + 1}</span>
+        <input type="text" dir="auto" data-o="${k}" value="${esc(q.options[k] || '')}" placeholder="${k < 2 ? 'תשובה' : 'רשות'}"><button class="ck" data-c="${k + 1}" title="זו התשובה הנכונה">✓</button></div>`).join('')}</div></td>
+      <td><div class="rowacts"><button class="ib" data-a="up" title="למעלה">⬆</button><button class="ib" data-a="down" title="למטה">⬇</button>
+        <button class="ib" data-a="dup" title="שכפל">⧉</button><button class="ib del" data-a="del" title="מחק">🗑</button></div></td></tr>`;
+  }).join('') || '<tr><td colspan="5"><div class="empty"><b>אין שאלות</b>לוחצים "+ שאלה" או "הדבק מאקסל"</div></td></tr>';
+  document.querySelectorAll('#qRows tr[data-i]').forEach(tr => {
+    const i = +tr.dataset.i, q = qs[i];
+    tr.querySelector('[data-f=type]').onchange = e => { q.type = e.target.value; renderQs(); autosave(); };
+    tr.querySelector('[data-f=text]').oninput = e => { q.text = e.target.value; autosave(); };
+    const nr = tr.querySelector('[data-f=newRound]'); if (nr) nr.onchange = e => { q.newRound = e.target.checked; renderQs(); autosave(); };
+    tr.querySelectorAll('[data-o]').forEach(inp => inp.oninput = () => { q.options[+inp.dataset.o] = inp.value; autosave(); });
+    tr.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { q.correct = +b.dataset.c; renderQs(); autosave(); });
+    const fi = tr.querySelector('[data-qimg]'); if (fi) fi.onchange = async () => { const url = await uploadImg(fi.files[0], 1400, false); if (url) { q.image = url; renderQs(); autosave(); } };
+    tr.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+      const a = b.dataset.a;
+      if (a === 'up' && i > 0) [qs[i - 1], qs[i]] = [qs[i], qs[i - 1]];
+      if (a === 'down' && i < qs.length - 1) [qs[i + 1], qs[i]] = [qs[i], qs[i + 1]];
+      if (a === 'dup') qs.splice(i + 1, 0, JSON.parse(JSON.stringify({ ...q, newRound: false })));
+      if (a === 'del') { if (!confirm(`למחוק את שאלה ${i + 1}?`)) return; qs.splice(i, 1); }
+      renderQs(); autosave();
+    });
+  });
+}
+$('qAdd').onclick = () => {
+  ED.pack.questions.push({ type:'regular', text:'', options:['', '', '', ''], correct:1, image:null, newRound:false });
+  renderQs(); autosave();
+  const last = [...document.querySelectorAll('#qRows [data-f=text]')].pop(); if (last) { last.scrollIntoView({ block:'center' }); last.focus(); }
+};
+
+/* paste / copy (Excel) */
+$('qPaste').onclick = () => { $('pasteBox').value = ''; $('pasteErr').classList.add('hidden'); openModal('mPaste'); setTimeout(() => $('pasteBox').focus(), 50); };
+const typeOf = t => /סקר|poll/i.test(t) ? 'poll' : /בונוס|bonus/i.test(t) ? 'bonus' : 'regular';
+$('pasteGo').onclick = () => {
+  const lines = $('pasteBox').value.split(/\r?\n/).map(l => l.split('\t')).filter(c => c.some(x => x.trim()));
+  if (lines.length && /שאלה|question/i.test(lines[0][0] || '') && lines[0].length > 2) lines.shift();
+  const got = lines.map(c => ({ type: typeOf(c[6] || ''), text: (c[0] || '').trim(), options: [1, 2, 3, 4].map(k => (c[k] || '').trim()),
+    correct: Math.min(4, Math.max(1, parseInt(c[5], 10) || 1)), image: null, newRound: false })).filter(q => q.text);
+  if (!got.length) { $('pasteErr').textContent = 'לא מצאתי שאלות. מעתיקים מאקסל שורות שלמות, עם תאים נפרדים לשאלה ולכל תשובה.'; $('pasteErr').classList.remove('hidden'); return; }
+  if (document.querySelector('[name=pm]:checked').value === 'replace') ED.pack.questions = got; else ED.pack.questions.push(...got);
+  $('mPaste').classList.add('hidden'); renderQs(); autosave(); toast(`נוספו ${got.length} שאלות ✓`);
+};
+$('qCopy').onclick = () => {
+  const name = Object.fromEntries(TYPES);
+  const rows = [['שאלה', 'תשובה 1', 'תשובה 2', 'תשובה 3', 'תשובה 4', 'נכונה', 'סוג']].concat(
+    ED.pack.questions.map(q => [q.text, ...q.options, q.type === 'poll' ? '' : q.correct, name[q.type]]));
+  copyText(rows.map(r => r.map(x => String(x ?? '').replace(/[\t\n]/g, ' ')).join('\t')).join('\n'), 'הועתק! מדביקים באקסל ✓');
+};
+
+/* saving */
+function autosave() { $('edSaved').textContent = 'שומר…'; clearTimeout(autosave.t); autosave.t = setTimeout(doSave, 900); }
+async function doSave(check) {
+  clearTimeout(autosave.t);
+  const p = ED.pack;
+  const r = await post('/api/admin/pack/save', { id: p.id, questions: p.questions, bg: p.bg, decor: p.decor, check: !!check });
+  $('edSaved').textContent = r.error ? '' : 'נשמר ✓';
+  return r;
+}
+function flushSave() { if (ED && autosave.t) { doSave(); } }
+$('edSave').onclick = async () => {
+  const showErr = t => { $('edErr').textContent = t; $('edErr').classList.remove('hidden'); };
+  $('edErr').classList.add('hidden'); $('edSave').disabled = true;
+  try {
+    const r = await doSave(true);
+    if (r.error) return showErr(r.error);
+    if (ED.mode === 'template') { toast('התבנית נשמרה ✓'); return; }
+    const title = $('eTitle').value.trim();
+    if (!title) return showErr('צריך לכתוב שם למשחק');
+    const body = { orderKey: ED.o.key, title, lang: EDL, players: $('ePlayers').value, days: $('eDays').value, scoreTable: $('eScore').checked };
+    if (ED.mode === 'editGame') {
+      const e = await post('/api/admin/order/edit-game', body);
+      if (e.error) return showErr(e.error);
+      toast('השינויים נשמרו ✓'); return;
+    }
+    const g = await post('/api/admin/order/game', { ...body, packId: ED.pack.id });
+    if (g.error) return showErr(g.error);
+    const o = ED.o; $('edClose').click();
+    $('lReal').textContent = g.real; $('lDemo').textContent = g.demo; $('gFor3').textContent = `עבור ${o.name}`;
+    step(3); openModal('mGame');
+  } finally { $('edSave').disabled = false; }
+};
+$('qTpl').onclick = async () => {
+  const name = prompt('איך לקרוא לתבנית? (למשל: בר מצווה, מסיבת כיתה)');
+  if (!name || !name.trim()) return;
+  await doSave();
+  const r = await post('/api/admin/pack/template', { id: ED.pack.id, name: name.trim() });
+  toast(r.error || `נשמר כתבנית "${name.trim()}" ✓`);
+};
+
+/* pictures: shrink in the browser before uploading */
+async function uploadImg(file, maxW, keepAlpha) {
+  if (!file) return null;
+  if (!/^image\//.test(file.type)) { toast('זה לא קובץ תמונה'); return null; }
+  toast('מעלה תמונה…');
+  const url = URL.createObjectURL(file), img = new Image();
+  await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = url; }).catch(() => null);
+  if (!img.width) { toast('לא הצלחתי לקרוא את התמונה'); return null; }
+  const k = Math.min(1, maxW / img.width), c = document.createElement('canvas');
+  c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+  const r = await post('/api/admin/img', { dataUrl: keepAlpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', .86) });
+  if (r.error) { toast(r.error); return null; }
+  toast('התמונה עלתה ✓'); return r.url;
+}
+
+/* templates page */
+async function loadTemplates() {
+  const t = await post('/api/admin/pack/templates');
+  $('tRows').innerHTML = (Array.isArray(t) && t.length) ? t.map(x => `<tr><td class="who"><b dir="auto">⭐ ${esc(x.name)}</b><span>${x.lang === 'he' ? 'עברית' : 'English'}</span></td>
+    <td class="num">${x.count}</td><td class="ord">${fmtDate(x.updatedAt)}</td>
+    <td><div class="acts"><button class="btn sm soft" data-tedit="${esc(x.id)}">✏️ ערוך</button><button class="btn sm danger" data-tdel="${esc(x.id)}">🗑 מחק</button></div></td></tr>`).join('')
+    : '<tr><td colspan="4"><div class="empty"><b>עוד אין תבניות</b>בעורך של משחק אישי לוחצים "⭐ שמור כתבנית"</div></td></tr>';
+  document.querySelectorAll('[data-tedit]').forEach(b => b.onclick = () => openEditor({ mode:'template', packId: b.dataset.tedit }));
+  document.querySelectorAll('[data-tdel]').forEach(b => b.onclick = async () => { if (!confirm('למחוק את התבנית? משחקים שכבר נוצרו ממנה לא ייפגעו.')) return; await post('/api/admin/pack/template/delete', { id: b.dataset.tdel }); loadTemplates(); });
+}
 
 /* manual orders */
 $('addOrder').onclick = () => openManual(null);
@@ -541,7 +857,7 @@ function fit(x, t, max) { t = String(t); if (x.measureText(t).width <= max) retu
 async function boot() {
   if (!KEY) return showLogin(false);
   try { await loadOrders(); loadBalance(); } catch (e) { return; }
-  clearInterval(boot.t); boot.t = setInterval(() => { if (!document.querySelector('.modal:not(.hidden)')) loadOrders(); }, 30000);
+  clearInterval(boot.t); boot.t = setInterval(() => { if (!document.querySelector('.modal:not(.hidden)') && !ED) loadOrders(); }, 30000);
   setInterval(loadBalance, 120000);
 }
 boot();
