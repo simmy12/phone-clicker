@@ -72,19 +72,25 @@ const store = (() => {
       async set(id, data) { await ready; await pool.query('insert into games (id, data, updated_at) values ($1,$2,now()) on conflict (id) do update set data=$2, updated_at=now()', [id, data]); },
       async list() { await ready; const r = await pool.query('select data from games order by updated_at desc limit 300'); return r.rows.map(x => x.data); },
       async orders() { await ready; const r = await pool.query("select data from games where data->>'kind'='order' order by updated_at desc limit 500"); return r.rows.map(x => x.data); },
+      async byKind(kind) { await ready; const r = await pool.query("select data from games where data->>'kind'=$1 order by updated_at desc limit 2000", [kind]); return r.rows.map(x => x.data); },
+      async del(id) { await ready; await pool.query('delete from games where id=$1', [id]); },
     };
   }
   const file = path.join(__dirname, 'data', 'games.json');
   let db = {};
   try { db = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
   let t = null;
-  const flush = () => { clearTimeout(t); t = setTimeout(() => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(db)); }, 300); };
+  const writeNow = () => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(db)); };
+  const flush = () => { clearTimeout(t); t = setTimeout(writeNow, 300); };
+  ['SIGTERM', 'SIGINT'].forEach(sig => process.once(sig, () => { clearTimeout(t); try { writeNow(); } catch {} process.exit(0); }));
   return {
     kind: 'file',
     async get(id) { return db[id] || null; },
     async set(id, data) { db[id] = data; flush(); },
     async list() { return Object.values(db).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 300); },
     async orders() { return Object.values(db).filter(o => o.kind === 'order'); },
+    async byKind(kind) { return Object.values(db).filter(o => o.kind === kind).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); },
+    async del(id) { delete db[id]; flush(); },
   };
 })();
 
@@ -103,6 +109,7 @@ const mask = p => '•••' + String(p).slice(-4);
 // ---------------- games ----------------
 const games = new Map();
 
+const DEMO_PLAYS = 2;   // a practice link can be played this many times
 const SIM_NAMES = ['שרה', 'מנחם', 'חיה', 'יוסי', 'רבקה', 'דוד', 'אהרן', 'לאה'];
 function newGame(info) {
   if (info.k === 'preview') {
@@ -152,6 +159,21 @@ async function getGame(info) {
 const langOf = g => (g.lang === 'en' ? 'en' : 'he');
 const questionsOf = g => { const L = loadTheme(g.theme).lang[langOf(g)]; return g.kind === 'demo' ? L.demo : L.questions; };
 const roundSize = g => g.kind === 'demo' ? 999 : (loadTheme(g.theme).roundSize || 5);
+// rounds: a question may name its round ("round": 2); otherwise every roundSize questions make a round
+const roundOfIdx = (g, i) => { const q = questionsOf(g)[i]; return q && q.round ? q.round - 1 : Math.floor(i / roundSize(g)); };
+function roundRange(g, i) {
+  const qs = questionsOf(g), r = roundOfIdx(g, i);
+  let from = i, to = i + 1;
+  while (from > 0 && roundOfIdx(g, from - 1) === r) from--;
+  while (to < qs.length && roundOfIdx(g, to) === r) to++;
+  return { from, to, no: r + 1 };
+}
+// "round genius / fastest" cards appear once per round, beside the 3rd real (non-poll) question
+function cardIdx(g, i) {
+  const { from, to } = roundRange(g, i), qs = questionsOf(g), real = [];
+  for (let k = from; k < to; k++) if (!qs[k].poll) real.push(k);
+  return real[Math.min(2, real.length - 1)];
+}
 const isConnected = p => p.connected && (p.sim || Date.now() - p.lastSeen < STALE_MS);
 const isLive = g => g.status === 'lobby' || g.status === 'play';
 
@@ -194,7 +216,7 @@ function advance(g) {
     case 'memory': return setPhase(g, 'question', auto ? g.seconds * 1000 : 0);
     case 'question': return setPhase(g, 'reveal', auto ? T.reveal : 0);
     case 'reveal':
-      if (more && (g.qIndex + 1) % roundSize(g) === 0) return setPhase(g, 'board', auto ? T.board : 0);
+      if (more && roundSize(g) < 100 && roundOfIdx(g, g.qIndex + 1) !== roundOfIdx(g, g.qIndex)) return setPhase(g, 'board', auto ? T.board : 0);
       return more ? startQuestion(g, g.qIndex + 1) : finish(g);
     case 'board': return startQuestion(g, g.qIndex + 1);
   }
@@ -224,7 +246,7 @@ function recordAnswer(g, p, digit) {
   const q = questionsOf(g)[g.qIndex];
   const ms = Date.now() - (g.phaseStartedAt || Date.now());
   const limit = (g.mode === 'auto' ? g.seconds : 30) * 1000;
-  const pts = digit === q.correct ? Math.round((500 + 500 * Math.max(0, 1 - ms / limit)) * (q.bonus ? 2 : 1)) : 0;
+  const pts = !q.poll && digit === q.correct ? Math.round((500 + 500 * Math.max(0, 1 - ms / limit)) * (q.bonus ? 2 : 1)) : 0;
   p.answers[g.qIndex] = { digit, ms: Math.max(0, ms), points: pts };
   g.updatedAt = Date.now(); save(g);
   if (g.mode === 'manual' && allAnswered(g) && !g.paused) advance(g);   // with a timer, the timer always runs to the end
@@ -233,7 +255,7 @@ function simAnswers(g) {
   const qi = g.qIndex, q = questionsOf(g)[qi];
   g.players.filter(p => p.sim).forEach(p => setTimeout(() => {
     if (g.status !== 'play' || g.phase !== 'question' || g.qIndex !== qi || p.answers[qi] || g.paused) return;
-    const digit = Math.random() < p.skill ? q.correct : 1 + Math.floor(Math.random() * q.options.length);
+    const digit = !q.poll && Math.random() < p.skill ? q.correct : 1 + Math.floor(Math.random() * q.options.length);
     recordAnswer(g, p, digit);
   }, 1500 + Math.random() * 9000));
 }
@@ -248,7 +270,7 @@ function scoreOf(g, p, from = 0, to = Infinity) {
   questionsOf(g).forEach((q, i) => {
     if (i < from || i >= to) return;
     const a = p.answers[i];
-    if (a && a.digit === q.correct) { correct++; score += a.points; ms += a.ms; }
+    if (a && !q.poll && a.digit === q.correct) { correct++; score += a.points; ms += a.ms; }
   });
   return { name: p.name, score, correct, ms };
 }
@@ -256,13 +278,14 @@ function ranking(g, upto = Infinity) {
   return g.players.map(p => scoreOf(g, p, 0, upto)).sort((a, b) => b.score - a.score || a.ms - b.ms);
 }
 function roundStats(g) {
-  const size = roundSize(g), from = Math.floor(g.qIndex / size) * size, to = from + size;
+  const { from, to } = roundRange(g, g.qIndex), qs = questionsOf(g);
+  const realCount = qs.slice(from, to).filter(q => !q.poll).length;
   const s = g.players.map(p => scoreOf(g, p, from, to)).filter(x => x.correct > 0);
   if (!s.length) return null;
   const smart = [...s].sort((a, b) => b.correct - a.correct || a.ms / a.correct - b.ms / b.correct)[0];
   const fast = [...s].sort((a, b) => a.ms / a.correct - b.ms / b.correct || b.correct - a.correct)[0];
   return {
-    smart: { name: smart.name, correct: smart.correct, of: Math.min(size, questionsOf(g).length - from) },
+    smart: { name: smart.name, correct: smart.correct, of: realCount },
     fast: { name: fast.name, avg: +(fast.ms / fast.correct / 1000).toFixed(1) },
   };
 }
@@ -412,12 +435,14 @@ app.get('/api/game', withGame, (req, res) => {
   res.json({
     kind: g.kind, title: g.title, max: g.max, status: g.status, phase: g.phase, paused: g.paused, resumed: !!g.resumed,
     mode: g.mode, seconds: g.seconds, phone: PHONE_NUMBER, total: qs.length, qIndex: g.qIndex, roundSize: roundSize(g),
-    remainingMs: left, phaseLen: g.phaseLen, used: g.used,
+    qNo: q && !q.poll ? qs.slice(0, g.qIndex + 1).filter(x => !x.poll).length : null, qTotal: qs.filter(x => !x.poll).length,
+    roundNo: q && roundSize(g) < 100 ? roundRange(g, g.qIndex).no : 1, roundStart: !!q && roundSize(g) < 100 && roundRange(g, g.qIndex).from === g.qIndex,
+    remainingMs: left, phaseLen: g.phaseLen, used: g.used, playsLeft: g.kind === 'demo' ? Math.max(0, DEMO_PLAYS - (g.plays || 0)) : null,
     lang: langOf(g), theme: { id: th.id, title: th.lang[langOf(g)].title, subtitle: th.lang[langOf(g)].subtitle, decor: th.decor, bonusImage: th.bonusImage },
     question: showQ || (g.status === 'play' && g.phase === 'intro') ? {
       text: g.phase === 'memory' || g.phase === 'intro' ? null : q.text,
       options: g.phase === 'memory' || g.phase === 'intro' ? null : q.options,
-      image: q.image || null, bonus: !!q.bonus, correct: reveal ? q.correct : null,
+      image: q.image || null, bonus: !!q.bonus, poll: !!q.poll, correct: reveal && !q.poll ? q.correct : null,
     } : null,
     counts: reveal ? q.options.map((_, i) => g.players.filter(p => p.answers[g.qIndex]?.digit === i + 1).length) : null,
     answeredCount: q ? g.players.filter(p => p.answers[g.qIndex]).length : 0,
@@ -425,8 +450,8 @@ app.get('/api/game', withGame, (req, res) => {
     players: g.players.map(p => ({ name: p.name, phone: mask(p.phone), connected: isConnected(p), tested: !!p.tested })),
     bonusRight: reveal && q.bonus ? g.players.filter(p => p.answers[g.qIndex]?.digit === q.correct).map(p => p.name) : null,
     ranking: g.phase === 'board' || g.status === 'finished' ? ranking(g) : null,
-    prevRanking: g.phase === 'board' ? ranking(g, Math.floor(g.qIndex / roundSize(g)) * roundSize(g)) : null,
-    round: reveal && roundSize(g) < 100 && g.qIndex % roundSize(g) === 2 ? roundStats(g) : null,   // once per round, beside a question
+    prevRanking: g.phase === 'board' ? ranking(g, roundRange(g, g.qIndex).from) : null,
+    round: reveal && roundSize(g) < 100 && !q.poll && cardIdx(g, g.qIndex) === g.qIndex ? roundStats(g) : null,   // once per round, beside a question
   });
 });
 
@@ -462,6 +487,8 @@ app.post('/api/game/start', withGame, (req, res) => {
   const g = req.game;
   if (g.status !== 'lobby') return res.status(400).json({ error: 'notLobby' });
   if (g.kind === 'real' && g.used) return res.status(400).json({ error: 'linkUsed' });
+  if (g.kind === 'demo' && (g.plays || 0) >= DEMO_PLAYS) return res.status(400).json({ error: 'demoUsed' });
+  if (g.kind === 'demo') g.plays = (g.plays || 0) + 1;
   g.status = 'play'; g.used = true; g.startedAt = Date.now();
   g.players.forEach(p => { p.answers = {}; });
   if (g.kind === 'demo') { clearTimeout(g.limitTimer); g.limitTimer = setTimeout(() => finish(g), T.demoLimit); }
@@ -483,6 +510,7 @@ app.post('/api/game/end', withGame, (req, res) => { if (req.game.status === 'pla
 app.post('/api/game/again', withGame, (req, res) => {     // only demo games can be played again
   const g = req.game;
   if (g.kind === 'real') return res.status(400).json({ error: 'linkUsed' });   // the real game plays once; demo and preview can repeat
+  if (g.kind === 'demo' && (g.plays || 0) >= DEMO_PLAYS) return res.status(400).json({ error: 'demoUsed' });
   clearTimer(g); clearTimeout(g.limitTimer);
   Object.assign(g, { status: 'lobby', phase: null, qIndex: -1, paused: false, used: false });
   g.players.forEach(p => { p.answers = {}; });
@@ -514,14 +542,162 @@ app.post('/api/admin/create', adminOnly, (req, res) => {
   const max = Math.min(100, Math.max(1, parseInt(req.body.maxPlayers, 10) || 8));
   const real = makeToken({ ...base, id, k: 'real', max });
   const demo = makeToken({ ...base, id: id + '-demo', k: 'demo', max: Math.min(DEMO_MAX, max) });
-  store.set(id, snapshot(newGame({ id, k: 'real', th: theme, lg: base.lg, title: base.title, max }))).catch(() => {});
-  res.json({ real: `${baseOf(req)}/play.html?t=${real}`, demo: `${baseOf(req)}/play.html?t=${demo}` });
+  const links = { real: `${baseOf(req)}/play.html?t=${real}`, demo: `${baseOf(req)}/play.html?t=${demo}` };
+  store.set(id, snapshot(Object.assign(newGame({ id, k: 'real', th: theme, lg: base.lg, title: base.title, max }), { links, createdAt: Date.now(), scoreTable: !!req.body.scoreTable }))).catch(() => {});
+  res.json(links);
 });
 
 app.post('/api/admin/preview', adminOnly, (req, res) => {   // a sample game with fake players, to see how it looks
   const en = req.body.lang === 'en';
   const t = makeToken({ id: 'preview-' + crypto.randomBytes(4).toString('hex'), k: 'preview', th: 'hanukkah', lg: en ? 'en' : 'he', title: en ? 'Sample Game' : 'משחק לדוגמה', max: 8, exp: Date.now() + 86400000 });
   res.json({ link: `${baseOf(req)}/play.html?t=${t}` });
+});
+
+// ================= order management (admin) =================
+// Orders come from three places: the Google Sheet of the Chanukah site (read only, trivia orders only),
+// orders typed in by hand in the admin ("morder"), and the old order page ("order").
+// Everything the admin marks (game created, links, sent, score table) lives here, never in the sheet.
+const TRIVIA_RE = /trivia|טריוויה|family|משפח|party|מסיב/i;
+async function getSettings() { return (await store.get('settings')) || { id: 'settings', kind: 'settings' }; }
+function playersFor(pkg, qty, participants) {
+  const n = parseInt(participants, 10);
+  if (n > 0) return Math.min(100, n);
+  const q = Math.max(1, parseInt(qty, 10) || 1);
+  if (/party|מסיב/i.test(pkg)) return Math.min(100, 8 * q);
+  return 8;
+}
+function toMs(d) {
+  if (typeof d === 'number') return d;
+  const t = Date.parse(d); if (!isNaN(t)) return t;
+  const m = String(d || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);   // dd/MM/yyyy HH:mm
+  return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime() : 0;
+}
+let sheetCache = { at: 0, data: [], error: '' };
+async function sheetOrders(force) {
+  if (!force && Date.now() - sheetCache.at < 45000) return sheetCache;
+  const st = await getSettings();
+  if (!st.sheetUrl) return (sheetCache = { at: Date.now(), data: [], error: 'notConnected' });
+  try {
+    const u = new URL(st.sheetUrl); u.searchParams.set('key', st.sheetKey || '');
+    const r = await fetch(u, { redirect: 'follow' });
+    const j = JSON.parse(await r.text());
+    if (j.error) throw new Error(j.error);
+    const data = (j.orders || []).filter(o => TRIVIA_RE.test(o.pkg || '')).map(o => ({
+      src: 'sheet', key: 's-' + o.id, orderNo: String(o.id || ''), date: toMs(o.date), name: o.name || '', phone: o.phone || '',
+      email: o.email || '', pkg: o.pkg || '', notes: o.notes || '', total: o.total || '', players: playersFor(o.pkg, o.qty, o.participants),
+    }));
+    sheetCache = { at: Date.now(), data, error: '' };
+  } catch (e) { sheetCache = { ...sheetCache, at: Date.now(), error: String(e.message || e).slice(0, 200) }; }
+  return sheetCache;
+}
+const metaId = key => 'om-' + key;
+async function allOrders(force) {
+  const [sheet, manual, page, metas] = await Promise.all([sheetOrders(force), store.byKind('morder'), store.byKind('order'), store.byKind('ometa')]);
+  const meta = Object.fromEntries(metas.map(m => [m.key, m]));
+  const list = [
+    ...sheet.data,
+    ...manual.map(o => ({ src: 'manual', key: o.id, orderNo: '', date: o.createdAt, name: o.name, phone: o.phone, email: o.email || '', pkg: '', notes: o.notes || '', total: '', players: o.players || 8 })),
+    ...page.map(o => ({ src: 'page', key: 'p-' + o.id, orderNo: '', date: o.createdAt, name: o.name, phone: o.phone, email: o.email || '', pkg: o.pkg || '', notes: [o.night, o.city, o.notes].filter(Boolean).join(' · '), total: '', players: 8 })),
+  ];
+  const out = [];
+  for (const o of list) {
+    const m = meta[o.key] || null;
+    let game = null;
+    if (m && m.gameId) {
+      const g = games.get(m.gameId) || await store.get(m.gameId);
+      if (g) game = { id: g.id, status: g.status, used: !!g.used, finishedAt: g.finishedAt || 0, title: g.title, max: g.max, lang: g.lang, scoreTable: !!g.scoreTable };
+    }
+    const played = game && (game.status === 'finished' || game.used);
+    const status = !m || !m.gameId ? 'new' : played ? 'played' : m.sent ? 'sent' : 'created';
+    out.push({ ...o, status, sent: !!(m && m.sent), links: m && m.gameId ? { real: m.realLink, demo: m.demoLink } : null, game });
+  }
+  const rank = { new: 0, created: 1, sent: 2, played: 3 };
+  out.sort((a, b) => rank[a.status] - rank[b.status] || (b.date || 0) - (a.date || 0));
+  return { orders: out, sheetError: sheet.error, sheetAt: sheet.at };
+}
+function newGameLinks(req, { title, lang, max, days, scoreTable, orderKey }) {
+  const id = crypto.randomBytes(5).toString('hex');
+  const base = { title: String(title || '').slice(0, 60), th: 'hanukkah', lg: lang === 'he' ? 'he' : 'en', exp: Date.now() + Math.min(365, Math.max(1, parseInt(days, 10) || 30)) * 86400000 };
+  max = Math.min(100, Math.max(1, parseInt(max, 10) || 8));
+  const real = `${baseOf(req)}/play.html?t=${makeToken({ ...base, id, k: 'real', max })}`;
+  const demo = `${baseOf(req)}/play.html?t=${makeToken({ ...base, id: id + '-demo', k: 'demo', max: Math.min(DEMO_MAX, max) })}`;
+  const g = newGame({ id, k: 'real', th: 'hanukkah', lg: base.lg, title: base.title, max });
+  Object.assign(g, { scoreTable: !!scoreTable, orderKey: orderKey || '', links: { real, demo }, createdAt: Date.now() });
+  games.set(id, g);
+  store.set(id, snapshot(g)).catch(() => {});
+  return { id, real, demo };
+}
+
+app.post('/api/admin/orders', adminOnly, async (req, res) => res.json(await allOrders(!!req.body.refresh)));
+
+app.post('/api/admin/order/game', adminOnly, async (req, res) => {
+  const key = String(req.body.orderKey || '');
+  if (!key) return res.status(400).json({ error: 'חסרה הזמנה' });
+  const old = await store.get(metaId(key));
+  if (old && old.gameId) return res.status(400).json({ error: 'כבר נוצר משחק להזמנה הזאת' });
+  const b = req.body, made = newGameLinks(req, { title: b.title, lang: b.lang, max: b.players, days: b.days, scoreTable: b.scoreTable, orderKey: key });
+  await store.set(metaId(key), { id: metaId(key), kind: 'ometa', key, gameId: made.id, realLink: made.real, demoLink: made.demo, sent: false, concept: 'chanukah', createdAt: Date.now(), updatedAt: Date.now() });
+  res.json({ ok: true, real: made.real, demo: made.demo });
+});
+
+async function liveOrStored(id) { return games.get(id) || await store.get(id); }
+app.post('/api/admin/order/edit-game', adminOnly, async (req, res) => {
+  const m = await store.get(metaId(String(req.body.orderKey || '')));
+  if (!m || !m.gameId) return res.status(404).json({ error: 'לא נמצא משחק' });
+  const g = await liveOrStored(m.gameId);
+  if (!g) return res.status(404).json({ error: 'לא נמצא משחק' });
+  if (g.used || g.status === 'play' || g.status === 'finished') return res.status(400).json({ error: 'המשחק כבר התחיל, אי אפשר לערוך' });
+  const max = Math.min(100, Math.max(1, parseInt(req.body.players, 10) || g.max));
+  if ((g.players || []).length > max) return res.status(400).json({ error: `כבר נרשמו ${g.players.length} שחקנים. אי אפשר להוריד מתחת למספר הזה` });
+  const upd = { title: String(req.body.title ?? g.title).slice(0, 60), lang: req.body.lang === 'he' ? 'he' : 'en', max, scoreTable: !!req.body.scoreTable, updatedAt: Date.now() };
+  Object.assign(g, upd);
+  if (games.has(g.id)) save(g); else await store.set(g.id, { ...g, ...upd });
+  const demoId = g.id + '-demo', d = await liveOrStored(demoId);   // the practice game follows the same settings
+  const dUpd = { title: upd.title, lang: upd.lang, max: Math.min(DEMO_MAX, max), updatedAt: Date.now() };
+  if (d) { Object.assign(d, dUpd); if (games.has(demoId)) save(d); else await store.set(demoId, { ...d, ...dUpd }); }
+  else await store.set(demoId, snapshot(newGame({ id: demoId, k: 'demo', th: g.theme, lg: upd.lang, title: upd.title, max: dUpd.max })));
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/order/sent', adminOnly, async (req, res) => {
+  const m = await store.get(metaId(String(req.body.orderKey || '')));
+  if (!m) return res.status(404).json({ error: 'לא נמצאה הזמנה' });
+  m.sent = !!req.body.sent; m.updatedAt = Date.now();
+  await store.set(m.id, m); res.json({ ok: true });
+});
+
+app.post('/api/admin/morder', adminOnly, async (req, res) => {   // add or change an order typed in by hand
+  const b = req.body, clip = (v, n) => String(v || '').trim().slice(0, n);
+  const id = b.id && String(b.id).startsWith('m-') ? String(b.id) : 'm-' + crypto.randomBytes(5).toString('hex');
+  const old = (await store.get(id)) || { createdAt: Date.now() };
+  const o = { ...old, id, kind: 'morder', name: clip(b.name, 80), phone: clip(b.phone, 30), email: clip(b.email, 120),
+    players: Math.min(100, Math.max(1, parseInt(b.players, 10) || 8)), notes: clip(b.notes, 500), updatedAt: Date.now() };
+  if (!o.name) return res.status(400).json({ error: 'צריך לכתוב שם' });
+  await store.set(id, o); res.json({ ok: true, id });
+});
+app.post('/api/admin/morder/delete', adminOnly, async (req, res) => {
+  const id = String(req.body.id || '');
+  if (!id.startsWith('m-')) return res.status(400).json({ error: 'אפשר למחוק רק הזמנה ידנית' });
+  await store.del(id); await store.del(metaId(id)); res.json({ ok: true });
+});
+
+app.post('/api/admin/results', adminOnly, async (req, res) => {   // final scores, for the score picture
+  const g = await liveOrStored(String(req.body.gameId || ''));
+  if (!g) return res.status(404).json({ error: 'לא נמצא משחק' });
+  const list = ranking(g).map((p, i) => ({ place: i + 1, name: p.name, score: p.score, correct: p.correct }));
+  const real = questionsOf(g).filter(q => !q.poll).length;
+  res.json({ title: g.title, lang: langOf(g), finishedAt: g.finishedAt, startedAt: g.startedAt, questions: real, ranking: list });
+});
+
+app.post('/api/admin/settings', adminOnly, async (req, res) => {   // connect the Google Sheet (or read the current setting)
+  const st = await getSettings();
+  if (req.body.save) {
+    st.sheetUrl = String(req.body.sheetUrl || '').trim(); if (req.body.sheetKey) st.sheetKey = String(req.body.sheetKey).trim();
+    st.updatedAt = Date.now(); await store.set('settings', st);
+    const r = await sheetOrders(true);
+    return res.json({ ok: !r.error, error: r.error, count: r.data.length, sheetUrl: st.sheetUrl, hasKey: !!st.sheetKey });
+  }
+  res.json({ sheetUrl: st.sheetUrl || '', hasKey: !!st.sheetKey });
 });
 
 // --- orders from the public order page (/order.html) ---
@@ -540,10 +716,6 @@ app.post('/api/order', async (req, res) => {
   await store.set(o.id, o);
   console.log('NEW ORDER', o.pkg, o.night, mask(o.phone));
   res.json({ ok: true });
-});
-app.post('/api/admin/orders', adminOnly, async (req, res) => {
-  const list = await store.orders();
-  res.json(list.sort((a, b) => b.createdAt - a.createdAt));
 });
 // --- public demo: a sample game with fake players, no phone calls, no cost ---
 const demoHits = new Map();
@@ -565,12 +737,13 @@ app.post('/api/admin/balance', adminOnly, async (req, res) => {
 });
 
 app.post('/api/admin/games', adminOnly, async (req, res) => {
-  const list = await store.list();
-  res.json(list.filter(g => g.kind === 'real').map(g => {
+  const list = await store.byKind('real');
+  res.json(list.map(g => {
     const live = games.get(g.id) || g;
-    return { title: live.title, status: live.status, used: live.used, players: live.players.length,
+    return { id: live.id, title: live.title, status: live.status, used: live.used, players: live.players.length,
              connected: live.players.filter(p => p.connected && Date.now() - p.lastSeen < STALE_MS).length,
-             startedAt: live.startedAt, max: live.max };
+             startedAt: live.startedAt, finishedAt: live.finishedAt || 0, createdAt: live.createdAt || 0, max: live.max, lang: live.lang,
+             scoreTable: !!live.scoreTable, orderKey: live.orderKey || '', links: live.links || null };
   }));
 });
 

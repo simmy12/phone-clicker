@@ -3,298 +3,170 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>טריוויה בקליקרים</title>
-<style>
-  :root { --bg1:#1a1446; --bg2:#3b1d6e; --card:rgba(255,255,255,.08); --line:rgba(255,255,255,.15);
-          --o1:#e5484d; --o2:#3e7bfa; --o3:#f5b301; --o4:#2fb35f; --gold:#ffd23f; }
-  * { box-sizing:border-box; }
-  html,body { margin:0; height:100%; }
-  body { font-family:"Segoe UI",Arial,sans-serif; color:#fff; background:radial-gradient(circle at 30% 20%,var(--bg2),var(--bg1) 70%); overflow-x:hidden; }
-  .wrap { max-width:1200px; margin:0 auto; padding:28px 32px; min-height:100%; display:flex; flex-direction:column; }
-  h1 { font-size:44px; margin:0 0 6px; } h2 { font-size:30px; margin:0 0 16px; }
-  .sub { opacity:.75; font-size:20px; }
-  button { font:inherit; font-size:20px; font-weight:700; border:0; border-radius:14px; padding:14px 28px; cursor:pointer; color:#fff; background:#7c3aed; box-shadow:0 4px 0 rgba(0,0,0,.3); }
-  button:active { transform:translateY(2px); box-shadow:0 2px 0 rgba(0,0,0,.3); }
-  button.ghost { background:rgba(255,255,255,.12); box-shadow:none; }
-  button.big { font-size:28px; padding:18px 48px; background:linear-gradient(135deg,#22c55e,#16a34a); }
-  button:disabled { opacity:.4; cursor:default; }
-  .bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:20px; }
-  .spacer { flex:1; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:20px; padding:24px; }
-  input, select { font:inherit; font-size:18px; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:rgba(255,255,255,.95); color:#111; width:100%; }
-  table { width:100%; border-collapse:collapse; } td { padding:5px; } td.n { width:40px; text-align:center; opacity:.7; font-weight:700; }
-  .err { color:#ffb4b4; font-size:18px; min-height:24px; margin-top:10px; }
-  .hidden { display:none !important; }
-  #sound { position:fixed; top:14px; left:14px; z-index:5; padding:10px 14px; font-size:22px; }
-
-  /* lobby */
-  .callnum { text-align:center; margin:10px 0 24px; }
-  .callnum .lbl { font-size:28px; opacity:.85; }
-  .callnum .num { font-size:72px; font-weight:800; letter-spacing:2px; direction:ltr; color:var(--gold); text-shadow:0 4px 24px rgba(255,210,63,.35); }
-  .players { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
-  .pl { border-radius:16px; padding:16px; background:rgba(255,255,255,.07); border:2px dashed var(--line); transition:.3s; text-align:center; }
-  .pl .nm { font-size:24px; font-weight:700; } .pl .ph { opacity:.6; direction:ltr; }
-  .pl.on { background:rgba(47,179,95,.25); border:2px solid #2fb35f; animation:pop .4s; }
-  @keyframes pop { 0%{transform:scale(.85)} 60%{transform:scale(1.08)} 100%{transform:scale(1)} }
-
-  /* question */
-  .qhead { display:flex; align-items:center; gap:20px; }
-  .qnum { font-size:22px; opacity:.8; }
-  .timer { width:110px; height:110px; position:relative; flex-shrink:0; }
-  .timer svg { transform:rotate(-90deg); }
-  .timer .t { position:absolute; inset:0; display:grid; place-items:center; font-size:40px; font-weight:800; }
-  .qtext { font-size:46px; font-weight:800; line-height:1.25; margin:28px 0 36px; }
-  .opts { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
-  .opt { display:flex; align-items:center; gap:18px; padding:22px 24px; border-radius:20px; font-size:34px; font-weight:700; transition:.35s; position:relative; overflow:hidden; }
-  .opt .k { width:64px; height:64px; border-radius:16px; background:rgba(255,255,255,.95); color:#222; display:grid; place-items:center; font-size:40px; font-weight:900; flex-shrink:0; }
-  .opt .cnt { margin-right:auto; font-size:28px; opacity:.9; }
-  .o1{background:var(--o1)} .o2{background:var(--o2)} .o3{background:var(--o3)} .o4{background:var(--o4)}
-  .opt.dim { opacity:.25; filter:grayscale(.6); }
-  .opt.win { outline:6px solid #fff; transform:scale(1.03); box-shadow:0 0 40px rgba(255,255,255,.5); }
-  .chips { display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; }
-  .chip { padding:8px 14px; border-radius:30px; background:rgba(255,255,255,.1); font-size:19px; transition:.3s; }
-  .chip.ans { background:#7c3aed; animation:pop .35s; }
-  .chip.right { background:#16a34a; } .chip.wrong { background:#b91c1c; } .chip.off { opacity:.35; }
-  .phase-bar { height:8px; background:rgba(255,255,255,.12); border-radius:8px; overflow:hidden; margin-top:18px; }
-  .phase-bar div { height:100%; background:var(--gold); width:0; transition:width .6s linear; }
-
-  /* finish */
-  .podium { display:flex; align-items:flex-end; justify-content:center; gap:24px; margin:30px 0; }
-  .step { width:220px; text-align:center; }
-  .step .who { font-size:30px; font-weight:800; margin-bottom:6px; } .step .pts { opacity:.8; margin-bottom:8px; font-size:20px; }
-  .step .blk { border-radius:16px 16px 0 0; display:grid; place-items:center; font-size:64px; animation:rise .9s ease-out both; }
-  .s1 .blk { height:240px; background:linear-gradient(#ffd23f,#d49b00); animation-delay:.8s; }
-  .s2 .blk { height:170px; background:linear-gradient(#e2e8f0,#94a3b8); animation-delay:.4s; }
-  .s3 .blk { height:120px; background:linear-gradient(#f0a868,#b8642a); }
-  @keyframes rise { from { transform:scaleY(0); transform-origin:bottom; } to { transform:scaleY(1); transform-origin:bottom; } }
-  .rank { max-width:600px; margin:0 auto; } .rank div { display:flex; justify-content:space-between; padding:8px 14px; border-bottom:1px solid var(--line); font-size:20px; }
-  .confetti { position:fixed; top:-20px; width:12px; height:18px; z-index:9; animation:fall linear forwards; pointer-events:none; }
-  @keyframes fall { to { transform:translateY(110vh) rotate(720deg); } }
-</style>
+<title>טריוויה</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="game.css">
 </head>
 <body>
-<button id="sound" class="ghost" onclick="toggleSound()" title="צלילים">🔊</button>
-<div class="wrap">
+<div id="viewport">
+  <div id="stage">
+    <div id="bg" class="bg"></div>
+    <div id="bg2" class="bg"></div>
+    <div class="vignette"></div>
+    <div id="decor"></div>
+    <canvas id="fx" width="1920" height="1080"></canvas>
 
-  <!-- setup -->
-  <section id="setup" class="hidden">
-    <h1 id="title1">טריוויה בקליקרים</h1>
-    <div class="sub">הכניסו את שמות השחקנים ואת מספרי הטלפון שמהם הם יתקשרו</div>
-    <div class="card" style="margin-top:20px">
-      <table id="rows"></table>
-      <div class="bar">
-        <label style="font-size:20px">מעבר בין שאלות:</label>
-        <select id="mode" style="width:auto" onchange="$('secWrap').classList.toggle('hidden', this.value!=='auto')">
-          <option value="auto">אוטומטי לפי טיימר</option>
-          <option value="manual">ידני, בלחיצה (כמו מצגת)</option>
-        </select>
-        <span id="secWrap"><input id="seconds" type="number" min="5" max="120" value="20" style="width:90px"> שניות לשאלה</span>
+    <!-- host toolbar -->
+    <div id="toolbar" class="hidden">
+      <span id="tbInfo"></span>
+      <button data-act="next" title="הבא (רווח)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4" fill="currentColor"/><line x1="19" y1="5" x2="19" y2="19"/></svg></button>
+      <button data-act="pause" id="tbPause" title="השהיה (P)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg></button>
+      <button data-act="full" title="מסך מלא (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+      <button data-act="sound" id="tbSound" title="צלילים (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg></button>
+      <button data-act="end" title="סיום"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg></button>
+    </div>
+    <div id="confirmEnd" class="hidden">
+      <div class="welcome-box confirm-box">
+        <div class="confirm-icon">⚠️</div>
+        <div class="welcome-title" data-t="endTitle"></div>
+        <div class="welcome-text" data-t="endText"></div>
+        <div class="confirm-btns">
+          <button class="btn danger" id="endYes" data-t="endYes"></button>
+          <button class="btn ghost" id="endNo" data-t="endNo"></button>
+        </div>
       </div>
-      <div class="err" id="setupErr"></div>
-      <div class="bar"><button class="big" onclick="saveSetup()">המשך ←</button></div>
     </div>
-  </section>
-
-  <!-- lobby -->
-  <section id="lobby" class="hidden">
-    <div class="callnum">
-      <div class="lbl">חייגו מהטלפון לקליקר:</div>
-      <div class="num" id="phone"></div>
-      <div class="sub">כשתשמעו צפצוף, אתם בפנים. אל תנתקו עד סוף המשחק.</div>
+    <div id="roomBox" class="hidden">
+      <div class="welcome-box confirm-box room-box">
+        <div class="room-icon">🎉</div>
+        <div class="welcome-title" data-t="roomTitle"></div>
+        <div class="welcome-text" id="roomText"></div>
+        <div class="confirm-btns">
+          <button class="btn gold" id="roomAdd"></button>
+          <button class="btn ghost" id="roomGo" data-t="roomGo"></button>
+        </div>
+      </div>
     </div>
-    <div class="players" id="lobbyPlayers"></div>
-    <div class="bar">
-      <button class="ghost" onclick="post('again')">✎ עריכת שחקנים</button>
-      <div class="spacer"></div>
-      <span class="sub" id="lobbyCount"></span>
-      <button class="big" id="startBtn" onclick="unlockAudio(); post('start')">התחילו לשחק!</button>
+    <div id="welcome">
+      <div class="welcome-box">
+        <div class="welcome-title" data-t="welcomeTitle"></div>
+        <div class="welcome-text" data-t="welcomeText"></div>
+        <button class="btn go" id="welcomeOk" data-t="welcomeOk"></button>
+        <div class="welcome-hint" data-t="welcomeHint"></div>
+      </div>
     </div>
-  </section>
 
-  <!-- question / reveal -->
-  <section id="quiz" class="hidden" style="flex:1;display:flex;flex-direction:column">
-    <div class="qhead">
-      <div class="timer" id="timer"><svg width="110" height="110"><circle cx="55" cy="55" r="48" stroke="rgba(255,255,255,.15)" stroke-width="10" fill="none"/><circle id="ring" cx="55" cy="55" r="48" stroke="#ffd23f" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="301.6"/></svg><div class="t" id="tnum"></div></div>
-      <div class="qnum" id="qnum"></div>
-      <div class="spacer"></div>
-      <button class="ghost" id="nextBtn" onclick="next()"></button>
+    <!-- setup -->
+    <section id="s-setup" class="screen">
+      <div class="glass setup-panel">
+        <div class="logo-sm" id="setupTitle"></div>
+        <div class="muted" data-t="setupHint"></div>
+        <div class="roster" id="rows"></div>
+        <div class="row setup-foot">
+          <label data-t="modeLabel"></label>
+          <select id="mode"><option value="auto" data-t="modeAuto"></option><option value="manual" data-t="modeManual"></option></select>
+          <span id="secWrap" class="row"><input id="seconds" type="number" min="8" max="60" value="20"> <span data-t="seconds"></span></span>
+          <div class="spacer"></div>
+          <button class="btn gold" id="toLobby" data-t="toLobby"></button>
+        </div>
+        <div class="err" id="setupErr"></div>
+      </div>
+      <div class="glass demo-steps hidden" id="demoSteps"></div>
+    </section>
+
+    <!-- lobby -->
+    <section id="s-lobby" class="screen">
+      <div class="lobby-title" id="logo"></div>
+      <div class="lobby-sub" id="subRibbon"></div>
+      <div class="holo-wrap"><div class="holo">
+        <div class="holo-lbl" data-t="callUs"></div>
+        <div class="holo-num" id="phoneNum"></div>
+        <div class="holo-steps">
+          <div><span class="orb">📞</span><i data-t="step1"></i></div>
+          <div><span class="orb">🔔</span><i data-t="step2"></i></div>
+          <div><span class="orb">🔢</span><i data-t="step3"></i></div>
+        </div>
+      </div></div>
+      <div class="arc" id="lobbyChips"></div>
+      <div class="test-hint hidden" id="testHint" data-t="testHint"></div>
+      <div class="lobby-foot">
+        <button class="btn ghost" id="editBtn" data-t="editPlayers"></button>
+        <div class="line-warn hidden" id="lineWarn" data-t="lineWarn"></div>
+        <div class="spacer"></div>
+        <div class="counter"><b id="lobbyOn">0</b><span>/</span><span id="lobbyTotal">0</span><small data-t="onLineShort"></small></div>
+        <button class="btn go" id="startBtn" data-t="start"></button>
+      </div>
+    </section>
+
+    <!-- intro -->
+    <section id="s-intro" class="screen center">
+      <img id="introBonusImg" class="intro-bonus-img hidden" alt="">
+      <div class="intro-txt" id="introTxt"></div>
+      <div class="intro-sub" id="introSub"></div>
+    </section>
+
+    <!-- memory -->
+    <section id="s-memory" class="screen center">
+      <div class="mem-title" data-t="memoryTitle"></div>
+      <div class="mem-frame"><img id="memImg" alt=""></div>
+      <div class="mem-bar"><b id="memBar"></b></div>
+    </section>
+
+    <!-- question + reveal -->
+    <section id="s-quiz" class="screen">
+      <div class="q-top">
+        <div class="q-badge" id="qBadge"></div>
+      </div>
+      <div class="glass q-panel"><div class="q-text" id="qText" dir="auto"></div></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="timer" id="timer">
+        <svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="86" class="t-bg"/><circle cx="100" cy="100" r="86" class="t-fg" id="ring"/></svg>
+        <div class="t-num" id="tNum"></div>
+      </div>
+      <div class="jar" id="jar">
+        <div class="jar-glass" id="jarCoins"></div>
+        <div class="jar-lbl"><b id="jarNum">0</b> / <span id="jarTotal">0</span> <span data-t="jar"></span></div>
+      </div>
+      <div class="press-hint" data-t="pressKey"></div>
+      <div class="bonus-names hidden" id="bonusNames"></div>
+    </section>
+
+    <!-- leaders board -->
+    <section id="s-board" class="screen">
+      <div class="board-title" data-t="leaders"></div>
+      <div class="board" id="boardRows"></div>
+    </section>
+
+    <!-- finale -->
+    <section id="s-final" class="screen">
+      <div class="board-title" data-t="winners"></div>
+      <div class="podium-wrap">
+        <div class="pod p3" id="pod3"></div>
+        <div class="pod p1" id="pod1"></div>
+        <div class="pod p2" id="pod2"></div>
+        <img src="themes/base/podium.webp" class="podium-img" alt="">
+      </div>
+      <div class="final-rest" id="finalRest"></div>
+      <div class="final-foot" id="finalFoot"></div>
+    </section>
+
+    <section id="s-msg" class="screen center">
+      <div class="logo-sm" id="msgTitle"></div>
+      <div class="muted big" id="msgSub"></div>
+    </section>
+
+    <div id="pausedOverlay" class="hidden">
+      <div class="glass paused-box">
+        <div class="logo-sm" id="pausedTitle"></div>
+        <button class="btn gold" id="resumeBtn" data-t="resume"></button>
+      </div>
     </div>
-    <div class="qtext" id="qtext" dir="auto"></div>
-    <div class="opts" id="opts"></div>
-    <div class="chips" id="chips"></div>
-    <div class="phase-bar" id="phaseBar"><div></div></div>
-  </section>
-
-  <!-- finished -->
-  <section id="finish" class="hidden">
-    <h1 style="text-align:center">🏆 המנצחים 🏆</h1>
-    <div class="podium" id="podium"></div>
-    <div class="rank card" id="rank"></div>
-    <div class="bar" style="justify-content:center"><button onclick="post('again')">משחק נוסף</button></div>
-  </section>
-
-  <section id="bad" class="hidden"><h1>😕</h1><h2 id="badMsg"></h2></section>
+    <div id="sideCards" class="out"></div>
+    <div id="flash"></div>
+  </div>
 </div>
-
-<script>
-const $ = id => document.getElementById(id);
-const T = new URLSearchParams(location.search).get('t');
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let S = null, prev = {}, fetchedAt = 0, soundOn = true;
-
-async function api(path, body) {
-  const r = await fetch(path + (body ? '' : '?t=' + encodeURIComponent(T)), body ? { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ t:T, ...body }) } : {});
-  return r.json();
-}
-async function post(action, extra = {}) { const r = await api('/api/game/' + action, extra); if (r.error) alert(r.error); poll(); return r; }
-function next() { unlockAudio(); post('next'); }
-document.addEventListener('keydown', e => {
-  if (S && ['question','reveal'].includes(S.status) && (e.key === ' ' || e.key === 'ArrowLeft' || e.key === 'Enter')) { e.preventDefault(); next(); }
-});
-
-// ---------- setup ----------
-function buildRows(max, players) {
-  const saved = players && players.length ? players : JSON.parse(localStorage.getItem('roster-' + T) || '[]');
-  let h = '';
-  for (let i = 0; i < max; i++) {
-    const p = saved[i] || {};
-    h += `<tr><td class="n">${i + 1}</td><td><input class="nm" placeholder="שם" value="${esc(p.name || '')}"></td>
-          <td><input class="ph" placeholder="מספר טלפון" dir="ltr" value="${esc(p.phone || '')}"></td></tr>`;
-  }
-  $('rows').innerHTML = h;
-}
-async function saveSetup() {
-  unlockAudio();
-  const names = [...document.querySelectorAll('#rows .nm')], phones = [...document.querySelectorAll('#rows .ph')];
-  const players = names.map((n, i) => ({ name: n.value.trim(), phone: phones[i].value.trim() })).filter(p => p.name || p.phone);
-  if (players.some(p => !p.name || !p.phone)) { $('setupErr').textContent = 'לכל שחקן צריך שם וגם מספר טלפון'; return; }
-  localStorage.setItem('roster-' + T, JSON.stringify(players));
-  const r = await api('/api/game/players', { players, mode: $('mode').value, seconds: $('seconds').value });
-  $('setupErr').textContent = r.error || '';
-  poll();
-}
-
-// ---------- render ----------
-function show(id) { ['setup','lobby','quiz','finish','bad'].forEach(s => $(s).classList.toggle('hidden', s !== id)); }
-
-function render() {
-  const s = S;
-  if (s.status === 'setup') {
-    if (prev.status !== 'setup') { buildRows(s.max, null); $('title1').textContent = s.title || 'טריוויה בקליקרים'; $('mode').value = s.mode; $('seconds').value = s.seconds; $('secWrap').classList.toggle('hidden', s.mode !== 'auto'); }
-    show('setup'); music(false); return;
-  }
-  if (s.status === 'lobby') {
-    show('lobby'); music(true);
-    $('phone').textContent = s.phone;
-    const on = s.players.filter(p => p.connected).length;
-    $('lobbyCount').textContent = `מחוברים ${on} מתוך ${s.players.length}`;
-    $('startBtn').disabled = on === 0;
-    $('lobbyPlayers').innerHTML = s.players.map(p => `<div class="pl ${p.connected ? 'on' : ''}"><div class="nm">${p.connected ? '✅ ' : ''}${esc(p.name)}</div><div class="ph">${esc(p.phone)}</div></div>`).join('');
-    const before = prev.players ? prev.players.filter(p => p.connected).length : on;
-    if (on > before) sfx('join');
-    return;
-  }
-  if (s.status === 'question' || s.status === 'reveal') {
-    show('quiz'); music(false);
-    const isQ = s.status === 'question', q = s.question;
-    const newQ = prev.qIndex !== s.qIndex || prev.status !== s.status;
-    $('qnum').textContent = `שאלה ${s.qIndex + 1} מתוך ${s.total}`;
-    $('qtext').textContent = q.text;
-    $('opts').innerHTML = q.options.map((o, i) => {
-      const cls = isQ ? '' : (q.correct === i + 1 ? 'win' : 'dim');
-      return `<div class="opt o${i + 1} ${cls}"><div class="k">${i + 1}</div><div>${esc(o)}</div>${!isQ ? `<div class="cnt">${s.counts[i]} 👤</div>` : ''}</div>`;
-    }).join('');
-    $('chips').innerHTML = s.players.map(p => {
-      let c = 'chip', extra = '';
-      if (!p.connected) c += ' off';
-      if (isQ && p.answered) c += ' ans';
-      if (!isQ) { if (p.right) { c += ' right'; extra = ` +${p.gained}`; } else if (p.answered) c += ' wrong'; }
-      return `<span class="${c}">${isQ && p.answered ? '✔ ' : ''}${esc(p.name)}${extra}</span>`;
-    }).join('');
-    $('timer').style.visibility = isQ && s.mode === 'auto' ? 'visible' : 'hidden';
-    $('nextBtn').textContent = isQ ? (s.mode === 'manual' ? 'חשיפת תשובה ←' : 'דלג ←') : (s.qIndex + 1 < s.total ? 'לשאלה הבאה ←' : 'לתוצאות ←');
-    $('phaseBar').style.visibility = !isQ && s.mode === 'auto' ? 'visible' : 'hidden';
-    if (newQ) {
-      if (isQ) sfx('question'); else sfx('reveal');
-      const bar = $('phaseBar').firstElementChild;
-      bar.style.transition = 'none'; bar.style.width = '0';
-      if (!isQ && s.mode === 'auto') requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = 'width 7s linear'; bar.style.width = '100%'; }));
-    }
-    const answeredNow = s.players.filter(p => p.answered).length, answeredBefore = prev.players && prev.qIndex === s.qIndex ? prev.players.filter(p => p.answered).length : answeredNow;
-    if (isQ && answeredNow > answeredBefore) sfx('click');
-    return;
-  }
-  if (s.status === 'finished') {
-    show('finish'); music(false);
-    if (prev.status !== 'finished') {
-      const r = s.ranking, order = [[r[1], 's2', '🥈'], [r[0], 's1', '🥇'], [r[2], 's3', '🥉']];
-      $('podium').innerHTML = order.filter(x => x[0]).map(([p, c, m]) => `<div class="step ${c}"><div class="who">${esc(p.name)}</div><div class="pts">${p.score} נק׳ · ${p.correct} נכונות</div><div class="blk">${m}</div></div>`).join('');
-      $('rank').innerHTML = r.map((p, i) => `<div><span>${i + 1}. ${esc(p.name)}</span><span>${p.score} נק׳</span></div>`).join('');
-      sfx('fanfare'); confetti();
-    }
-  }
-}
-
-function tick() {   // smooth countdown between polls
-  if (!S || S.status !== 'question' || S.remainingMs == null) return;
-  const left = Math.max(0, S.remainingMs - (Date.now() - fetchedAt));
-  const sec = Math.ceil(left / 1000);
-  $('tnum').textContent = sec;
-  $('ring').style.strokeDashoffset = 301.6 * (1 - left / (S.seconds * 1000));
-  $('ring').style.stroke = sec <= 5 ? '#e5484d' : '#ffd23f';
-  if (sec !== tick.last && sec <= 5 && sec > 0) sfx('tick');
-  tick.last = sec;
-}
-setInterval(tick, 100);
-
-async function poll() {
-  try {
-    const s = await api('/api/game');
-    if (s.error) { $('badMsg').textContent = s.error; show('bad'); return; }
-    fetchedAt = Date.now(); S = s; render(); prev = JSON.parse(JSON.stringify(s));
-  } catch (e) {}
-}
-setInterval(poll, 700); poll();
-
-// ---------- sound (all generated in the browser) ----------
-let ac = null, musicTimer = null;
-function unlockAudio() { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); }
-function toggleSound() { soundOn = !soundOn; $('sound').textContent = soundOn ? '🔊' : '🔇'; if (!soundOn) music(false); else unlockAudio(); }
-function tone(freq, start, dur, type = 'triangle', vol = .18) {
-  if (!ac || !soundOn) return;
-  const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + start;
-  o.type = type; o.frequency.value = freq;
-  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .02); g.gain.exponentialRampToValueAtTime(.001, t + dur);
-  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + .05);
-}
-function sfx(name) {
-  const seq = {
-    join: [[660,0,.12],[990,.1,.2]],
-    click: [[1200,0,.06,'square',.06]],
-    tick: [[880,0,.08,'square',.07]],
-    question: [[523,0,.15],[659,.12,.15],[784,.24,.3]],
-    reveal: [[784,0,.12],[1047,.12,.35]],
-    fanfare: [[523,0,.2],[523,.2,.12],[523,.32,.12],[698,.45,.6],[880,1.05,.25],[784,1.3,.25],[1047,1.55,.9]],
-  }[name] || [];
-  seq.forEach(([f, s, d, t, v]) => tone(f, s, d, t, v));
-}
-function music(on) {   // cheerful waiting-room loop
-  if (on && soundOn && !musicTimer && ac) {
-    const notes = [523,659,784,659, 587,698,880,698, 523,659,784,1047, 784,659,587,494];
-    let i = 0;
-    musicTimer = setInterval(() => { tone(notes[i % notes.length], 0, .22, 'triangle', .09); if (i % 4 === 0) tone(notes[i % notes.length] / 2, 0, .5, 'sine', .08); i++; }, 230);
-  } else if (!on && musicTimer) { clearInterval(musicTimer); musicTimer = null; }
-}
-function confetti() {
-  const colors = ['#e5484d','#3e7bfa','#f5b301','#2fb35f','#ffffff','#a855f7'];
-  for (let i = 0; i < 150; i++) {
-    const c = document.createElement('div'); c.className = 'confetti';
-    c.style.left = Math.random() * 100 + 'vw'; c.style.background = colors[i % colors.length];
-    c.style.animationDuration = 2.5 + Math.random() * 3 + 's'; c.style.animationDelay = Math.random() * 1.5 + 's';
-    document.body.appendChild(c); setTimeout(() => c.remove(), 8000);
-  }
-}
-document.addEventListener('click', unlockAudio, { once: true });
-</script>
+<script src="game.js"></script>
 </body>
 </html>
