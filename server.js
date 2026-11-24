@@ -351,7 +351,8 @@ const sounds = {
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json({ limit: '8mb' }));
-app.use(express.static(PUBLIC, { maxAge: '1h' }));
+// code and text files are always checked for a newer version (so an update shows up right away); pictures and sounds are cached for an hour
+app.use(express.static(PUBLIC, { maxAge: '1h', setHeaders: (res, file) => { if (/\.(html|js|css|json)$/.test(file)) res.setHeader('Cache-Control', 'no-cache'); } }));
 
 app.get('/audio/:name.wav', (req, res) => {
   const s = sounds[req.params.name];
