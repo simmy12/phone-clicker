@@ -596,7 +596,7 @@ async function poll() {
 }
 
 async function loadLang(code) {
-  try { L = await (await fetch('lang/' + code + '.json')).json(); } catch { L = {}; }
+  try { L = await (await fetch('lang/' + code + '.json?v=12')).json(); } catch { L = {}; }
   applyTexts();
 }
 (async () => {
