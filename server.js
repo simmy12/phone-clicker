@@ -128,6 +128,7 @@ function baseGame(info) {
     max: info.k === 'demo' ? Math.min(DEMO_MAX, info.max || DEMO_MAX) : info.max, status: 'setup', phase: null, qIndex: -1,
     phaseEnd: 0, phaseLen: 0, paused: false, pausedLeft: 0, mode: 'auto', seconds: 20,
     players: [], used: false, startedAt: 0, finishedAt: 0, updatedAt: Date.now(), timer: null, limitTimer: null,
+    ...(info.pk ? { pack: info.pk } : {}),
   };
 }
 
@@ -151,13 +152,37 @@ async function getGame(info) {
   if (saved && g.status === 'play') {           // server restarted mid-game: wait for the host to press "resume"
     g.paused = true; g.pausedLeft = saved.phaseLeft || 0; g.phaseEnd = 0; g.resumed = true;
   }
+  if (!g.pack && info.pk) g.pack = info.pk;
+  if (g.pack) await loadPack(g.pack);
   if (g.status === 'play' && g.kind === 'real' && Date.now() - g.startedAt > T.resumeWindow) finish(g);
   games.set(g.id, g);
   return g;
 }
 
 const langOf = g => (g.lang === 'en' ? 'en' : 'he');
-const questionsOf = g => { const L = loadTheme(g.theme).lang[langOf(g)]; return g.kind === 'demo' ? L.demo : L.questions; };
+// custom question sets ("packs"), edited in the admin. A game with g.pack plays the pack instead of the theme questions.
+const packs = new Map();
+async function loadPack(id) {
+  if (!id) return null;
+  if (!packs.has(id)) { const p = await store.get(id); if (p) packs.set(id, compilePack(p)); }
+  return packs.get(id) || null;
+}
+function compilePack(p) {
+  let round = 0;
+  const qs = (p.questions || []).map((q, i) => {
+    if (i === 0 || q.newRound) round++;
+    const opts = (q.options || []).map(o => String(o || '').trim()).filter(Boolean).slice(0, 4);
+    return { text: String(q.text || ''), options: opts, correct: q.type === 'poll' ? null : Math.min(opts.length, Math.max(1, +q.correct || 1)),
+             bonus: q.type === 'bonus', poll: q.type === 'poll', image: q.type === 'image' && q.image ? q.image : null, round };
+  }).filter(q => q.text && q.options.length >= 2);
+  const demo = qs.filter(q => !q.poll).slice(0, 3).map(q => ({ ...q, round: 1, bonus: false }));
+  return { ...p, compiled: qs, demo };
+}
+const questionsOf = g => {
+  const pk = g.pack && packs.get(g.pack);
+  if (pk && pk.compiled.length) return g.kind === 'demo' ? pk.demo : pk.compiled;
+  const L = loadTheme(g.theme).lang[langOf(g)]; return g.kind === 'demo' ? L.demo : L.questions;
+};
 const roundSize = g => g.kind === 'demo' ? 999 : (loadTheme(g.theme).roundSize || 5);
 // rounds: a question may name its round ("round": 2); otherwise every roundSize questions make a round
 const roundOfIdx = (g, i) => { const q = questionsOf(g)[i]; return q && q.round ? q.round - 1 : Math.floor(i / roundSize(g)); };
@@ -325,7 +350,7 @@ const sounds = {
 // ---------------- web server ----------------
 const app = express();
 app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+app.use(express.json({ limit: '8mb' }));
 app.use(express.static(PUBLIC, { maxAge: '1h' }));
 
 app.get('/audio/:name.wav', (req, res) => {
@@ -438,7 +463,7 @@ app.get('/api/game', withGame, (req, res) => {
     qNo: q && !q.poll ? qs.slice(0, g.qIndex + 1).filter(x => !x.poll).length : null, qTotal: qs.filter(x => !x.poll).length,
     roundNo: q && roundSize(g) < 100 ? roundRange(g, g.qIndex).no : 1, roundStart: !!q && roundSize(g) < 100 && roundRange(g, g.qIndex).from === g.qIndex,
     remainingMs: left, phaseLen: g.phaseLen, used: g.used, playsLeft: g.kind === 'demo' ? Math.max(0, DEMO_PLAYS - (g.plays || 0)) : null,
-    lang: langOf(g), theme: { id: th.id, title: th.lang[langOf(g)].title, subtitle: th.lang[langOf(g)].subtitle, decor: th.decor, bonusImage: th.bonusImage },
+    lang: langOf(g), theme: themeView(g, th),
     question: showQ || (g.status === 'play' && g.phase === 'intro') ? {
       text: g.phase === 'memory' || g.phase === 'intro' ? null : q.text,
       options: g.phase === 'memory' || g.phase === 'intro' ? null : q.options,
@@ -454,6 +479,14 @@ app.get('/api/game', withGame, (req, res) => {
     round: reveal && roundSize(g) < 100 && !q.poll && cardIdx(g, g.qIndex) === g.qIndex ? roundStats(g) : null,   // once per round, beside a question
   });
 });
+
+function themeView(g, th) {
+  const L = th.lang[langOf(g)], pk = g.pack && packs.get(g.pack);
+  const decor = th.decor.map((f, i) => (pk && pk.decor && pk.decor[i]) || `themes/${th.id}/${f}`);
+  const plain = pk && pk.bg === 'plain';
+  return { id: th.id, title: plain ? (langOf(g) === 'en' ? 'Trivia Game Show' : 'שעשועון טריוויה') : L.title,
+           subtitle: L.subtitle, decor, bgDir: plain ? 'themes/base' : `themes/${th.id}`, bonusImage: th.bonusImage };
+}
 
 app.post('/api/game/players', withGame, (req, res) => {
   const g = req.game;
@@ -605,7 +638,7 @@ async function allOrders(force) {
     let game = null;
     if (m && m.gameId) {
       const g = games.get(m.gameId) || await store.get(m.gameId);
-      if (g) game = { id: g.id, status: g.status, used: !!g.used, finishedAt: g.finishedAt || 0, title: g.title, max: g.max, lang: g.lang, scoreTable: !!g.scoreTable };
+      if (g) game = { id: g.id, status: g.status, used: !!g.used, finishedAt: g.finishedAt || 0, title: g.title, max: g.max, lang: g.lang, scoreTable: !!g.scoreTable, pack: g.pack || null };
     }
     const played = game && (game.status === 'finished' || game.used);
     const status = !m || !m.gameId ? 'new' : played ? 'played' : m.sent ? 'sent' : 'created';
@@ -615,14 +648,15 @@ async function allOrders(force) {
   out.sort((a, b) => rank[a.status] - rank[b.status] || (b.date || 0) - (a.date || 0));
   return { orders: out, sheetError: sheet.error, sheetAt: sheet.at };
 }
-function newGameLinks(req, { title, lang, max, days, scoreTable, orderKey }) {
+function newGameLinks(req, { title, lang, max, days, scoreTable, orderKey, pack }) {
   const id = crypto.randomBytes(5).toString('hex');
   const base = { title: String(title || '').slice(0, 60), th: 'hanukkah', lg: lang === 'he' ? 'he' : 'en', exp: Date.now() + Math.min(365, Math.max(1, parseInt(days, 10) || 30)) * 86400000 };
+  if (pack) base.pk = pack;
   max = Math.min(100, Math.max(1, parseInt(max, 10) || 8));
   const real = `${baseOf(req)}/play.html?t=${makeToken({ ...base, id, k: 'real', max })}`;
   const demo = `${baseOf(req)}/play.html?t=${makeToken({ ...base, id: id + '-demo', k: 'demo', max: Math.min(DEMO_MAX, max) })}`;
-  const g = newGame({ id, k: 'real', th: 'hanukkah', lg: base.lg, title: base.title, max });
-  Object.assign(g, { scoreTable: !!scoreTable, orderKey: orderKey || '', links: { real, demo }, createdAt: Date.now() });
+  const g = newGame({ id, k: 'real', th: 'hanukkah', lg: base.lg, title: base.title, max, pk: pack });
+  Object.assign(g, { pack: pack || undefined, scoreTable: !!scoreTable, orderKey: orderKey || '', links: { real, demo }, createdAt: Date.now() });
   games.set(id, g);
   store.set(id, snapshot(g)).catch(() => {});
   return { id, real, demo };
@@ -635,8 +669,17 @@ app.post('/api/admin/order/game', adminOnly, async (req, res) => {
   if (!key) return res.status(400).json({ error: 'חסרה הזמנה' });
   const old = await store.get(metaId(key));
   if (old && old.gameId) return res.status(400).json({ error: 'כבר נוצר משחק להזמנה הזאת' });
-  const b = req.body, made = newGameLinks(req, { title: b.title, lang: b.lang, max: b.players, days: b.days, scoreTable: b.scoreTable, orderKey: key });
-  await store.set(metaId(key), { id: metaId(key), kind: 'ometa', key, gameId: made.id, realLink: made.real, demoLink: made.demo, sent: false, concept: 'chanukah', createdAt: Date.now(), updatedAt: Date.now() });
+  const b = req.body;
+  let pack = null;
+  if (b.packId) {
+    pack = await store.get(String(b.packId));
+    if (!pack || pack.kind !== 'qpack' || pack.template) return res.status(400).json({ error: 'השאלות לא נמצאו' });
+    if (pack.gameId) return res.status(400).json({ error: 'השאלות האלה כבר שייכות למשחק אחר' });
+    const err = packProblem(pack); if (err) return res.status(400).json({ error: err });
+  }
+  const made = newGameLinks(req, { title: b.title, lang: b.lang, max: b.players, days: b.days, scoreTable: b.scoreTable, orderKey: key, pack: pack && pack.id });
+  if (pack) { pack.gameId = made.id; pack.updatedAt = Date.now(); await store.set(pack.id, pack); packs.set(pack.id, compilePack(pack)); }
+  await store.set(metaId(key), { id: metaId(key), kind: 'ometa', key, gameId: made.id, realLink: made.real, demoLink: made.demo, sent: false, concept: pack ? 'custom' : 'chanukah', createdAt: Date.now(), updatedAt: Date.now() });
   res.json({ ok: true, real: made.real, demo: made.demo });
 });
 
@@ -655,8 +698,104 @@ app.post('/api/admin/order/edit-game', adminOnly, async (req, res) => {
   const demoId = g.id + '-demo', d = await liveOrStored(demoId);   // the practice game follows the same settings
   const dUpd = { title: upd.title, lang: upd.lang, max: Math.min(DEMO_MAX, max), updatedAt: Date.now() };
   if (d) { Object.assign(d, dUpd); if (games.has(demoId)) save(d); else await store.set(demoId, { ...d, ...dUpd }); }
-  else await store.set(demoId, snapshot(newGame({ id: demoId, k: 'demo', th: g.theme, lg: upd.lang, title: upd.title, max: dUpd.max })));
+  else await store.set(demoId, snapshot(newGame({ id: demoId, k: 'demo', th: g.theme, lg: upd.lang, title: upd.title, max: dUpd.max, pk: g.pack })));
   res.json({ ok: true });
+});
+
+// ---- custom question sets (packs) ----
+function seedFromTheme(lang) {
+  const th = loadTheme('hanukkah'), qs = th.lang[lang === 'he' ? 'he' : 'en'].questions;
+  let prev = 0;
+  return qs.map((q, i) => {
+    const r = q.round || Math.floor(i / (th.roundSize || 5)) + 1, newRound = i > 0 && r !== prev; prev = r;
+    const type = q.poll ? 'poll' : q.bonus ? 'bonus' : q.image ? 'image' : 'regular';
+    const options = [...q.options]; while (options.length < 4) options.push('');
+    return { type, text: q.text, options, correct: q.correct || 1, image: q.image ? `/themes/hanukkah/${q.image}` : null, newRound };
+  });
+}
+function cleanQuestions(list) {
+  return (Array.isArray(list) ? list : []).slice(0, 80).map(q => {
+    const options = [0, 1, 2, 3].map(i => String((q.options || [])[i] || '').slice(0, 90));
+    const type = ['regular', 'image', 'poll', 'bonus'].includes(q.type) ? q.type : 'regular';
+    const image = typeof q.image === 'string' && /^\/(pimg|themes)\/[\w\-./]+$/.test(q.image) ? q.image : null;
+    return { type, text: String(q.text || '').slice(0, 220), options, correct: Math.min(4, Math.max(1, parseInt(q.correct, 10) || 1)), image, newRound: !!q.newRound };
+  });
+}
+function packProblem(p) {
+  const qs = p.questions || [];
+  if (!qs.filter(q => q.type !== 'poll').length) return 'צריך לפחות שאלה אחת שאינה סקר';
+  for (let i = 0; i < qs.length; i++) {
+    const q = qs[i], n = i + 1, filled = q.options.filter(o => o.trim());
+    if (!q.text.trim()) return `בשאלה ${n} חסר טקסט`;
+    if (filled.length < 2) return `בשאלה ${n} צריך לפחות 2 תשובות`;
+    if (q.type !== 'poll' && !String(q.options[q.correct - 1] || '').trim()) return `בשאלה ${n} התשובה הנכונה ריקה`;
+    if (q.type === 'image' && !q.image) return `בשאלה ${n} (שאלת תמונה) חסרה תמונה`;
+  }
+  return '';
+}
+const cleanDecor = d => [0, 1, 2, 3].map(i => { const v = (d || [])[i]; return typeof v === 'string' && /^\/pimg\/[\w-]+$/.test(v) ? v : null; });
+const packView = p => ({ id: p.id, name: p.name || '', template: !!p.template, lang: p.lang, bg: p.bg || 'chanukah', decor: cleanDecor(p.decor), questions: p.questions, gameId: p.gameId || null });
+
+app.post('/api/admin/pack/new', adminOnly, async (req, res) => {
+  const lang = req.body.lang === 'he' ? 'he' : 'en';
+  let src = { questions: seedFromTheme(lang), bg: 'chanukah', decor: [null, null, null, null] };
+  if (req.body.from && req.body.from !== 'chanukah') {
+    const t = await store.get(String(req.body.from));
+    if (!t || t.kind !== 'qpack') return res.status(404).json({ error: 'התבנית לא נמצאה' });
+    src = t;
+  }
+  const p = { id: 'pk-' + crypto.randomBytes(5).toString('hex'), kind: 'qpack', template: false, lang, bg: src.bg || 'chanukah', decor: cleanDecor(src.decor),
+              questions: cleanQuestions(src.questions), createdAt: Date.now(), updatedAt: Date.now() };
+  await store.set(p.id, p); res.json(packView(p));
+});
+app.post('/api/admin/pack/get', adminOnly, async (req, res) => {
+  const p = await store.get(String(req.body.id || ''));
+  if (!p || p.kind !== 'qpack') return res.status(404).json({ error: 'לא נמצא' });
+  res.json(packView(p));
+});
+app.post('/api/admin/pack/save', adminOnly, async (req, res) => {
+  const p = await store.get(String(req.body.id || ''));
+  if (!p || p.kind !== 'qpack') return res.status(404).json({ error: 'לא נמצא' });
+  if (p.gameId) {
+    const g = await liveOrStored(p.gameId);
+    if (g && (g.used || g.status === 'play' || g.status === 'finished')) return res.status(400).json({ error: 'המשחק כבר התחיל, אי אפשר לשנות שאלות' });
+  }
+  p.questions = cleanQuestions(req.body.questions); p.bg = req.body.bg === 'plain' ? 'plain' : 'chanukah'; p.decor = cleanDecor(req.body.decor);
+  if (req.body.name != null) p.name = String(req.body.name).slice(0, 60);
+  const err = req.body.check ? packProblem(p) : '';
+  if (err) return res.status(400).json({ error: err });
+  p.updatedAt = Date.now(); await store.set(p.id, p); packs.set(p.id, compilePack(p));
+  res.json({ ok: true });
+});
+app.post('/api/admin/pack/template', adminOnly, async (req, res) => {   // save a copy as a reusable template
+  const p = await store.get(String(req.body.id || ''));
+  if (!p || p.kind !== 'qpack') return res.status(404).json({ error: 'לא נמצא' });
+  const name = String(req.body.name || '').trim().slice(0, 60);
+  if (!name) return res.status(400).json({ error: 'צריך לתת שם לתבנית' });
+  const t = { ...p, id: 'pk-' + crypto.randomBytes(5).toString('hex'), template: true, name, gameId: null, createdAt: Date.now(), updatedAt: Date.now() };
+  await store.set(t.id, t); res.json({ ok: true, id: t.id });
+});
+app.post('/api/admin/pack/templates', adminOnly, async (req, res) => {
+  const list = (await store.byKind('qpack')).filter(p => p.template);
+  res.json(list.map(p => ({ id: p.id, name: p.name, lang: p.lang, count: (p.questions || []).length, updatedAt: p.updatedAt })));
+});
+app.post('/api/admin/pack/template/delete', adminOnly, async (req, res) => {
+  const p = await store.get(String(req.body.id || ''));
+  if (!p || !p.template) return res.status(400).json({ error: 'אפשר למחוק רק תבנית' });
+  await store.del(p.id); res.json({ ok: true });
+});
+app.post('/api/admin/img', adminOnly, async (req, res) => {   // pictures for image questions and logos
+  const m = String(req.body.dataUrl || '').match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!m) return res.status(400).json({ error: 'קובץ תמונה לא תקין' });
+  if (m[2].length > 4 * 1024 * 1024) return res.status(400).json({ error: 'התמונה גדולה מדי' });
+  const id = 'img-' + crypto.randomBytes(6).toString('hex');
+  await store.set(id, { id, kind: 'pimg', mime: m[1], data: m[2], updatedAt: Date.now() });
+  res.json({ url: '/pimg/' + id });
+});
+app.get('/pimg/:id', async (req, res) => {
+  const im = /^img-[a-f0-9]+$/.test(req.params.id) ? await store.get(req.params.id) : null;
+  if (!im || im.kind !== 'pimg') return res.status(404).end();
+  res.set('Content-Type', im.mime).set('Cache-Control', 'public, max-age=31536000, immutable').send(Buffer.from(im.data, 'base64'));
 });
 
 app.post('/api/admin/order/sent', adminOnly, async (req, res) => {
