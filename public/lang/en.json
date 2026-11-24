@@ -84,5 +84,14 @@
  "welcomeTitle": "Welcome to the game show! 🎉",
  "welcomeText": "This game has music, an announcer and effects, and looks best on full screen. Clicking the button turns on the sound and switches to full screen.",
  "welcomeOk": "Got it, let's go!",
- "welcomeHint": "To leave full screen: Esc key · To mute: M key"
+ "welcomeHint": "To leave full screen: Esc key · To mute: M key",
+ "demoUsed": "This practice link has been used twice already. Your real game link is ready for party night!",
+ "demoLeft": "You can try it {n} more time",
+ "demoNoMore": "You've used both practice games. See you on party night!",
+ "roomTitle": "There's room for more players!",
+ "roomText": "Your game includes up to {max} players. You've added {n}, so {left} more can still join.",
+ "roomAdd": "Add {left} more players",
+ "roomGo": "Continue to the game",
+ "poll": "Quick Poll!",
+ "pollSub": "No right or wrong answers. Just tell us!"
 }
