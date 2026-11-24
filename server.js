@@ -642,7 +642,8 @@ async function allOrders(force) {
     }
     const played = game && (game.status === 'finished' || game.used);
     const status = !m || !m.gameId ? 'new' : played ? 'played' : m.sent ? 'sent' : 'created';
-    out.push({ ...o, status, sent: !!(m && m.sent), links: m && m.gameId ? { real: m.realLink, demo: m.demoLink } : null, game });
+    out.push({ ...o, status, sent: !!(m && m.sent), links: m && m.gameId ? { real: m.realLink, demo: m.demoLink } : null, game,
+               draft: m && !m.gameId && m.draftPack ? m.draftPack : null });
   }
   const rank = { new: 0, created: 1, sent: 2, played: 3 };
   out.sort((a, b) => rank[a.status] - rank[b.status] || (b.date || 0) - (a.date || 0));
@@ -734,7 +735,12 @@ function packProblem(p) {
   return '';
 }
 const cleanDecor = d => [0, 1, 2, 3].map(i => { const v = (d || [])[i]; return typeof v === 'string' && /^\/pimg\/[\w-]+$/.test(v) ? v : null; });
-const packView = p => ({ id: p.id, name: p.name || '', template: !!p.template, lang: p.lang, bg: p.bg || 'chanukah', decor: cleanDecor(p.decor), questions: p.questions, gameId: p.gameId || null });
+const packView = p => ({ id: p.id, name: p.name || '', template: !!p.template, lang: p.lang, bg: p.bg || 'chanukah', decor: cleanDecor(p.decor), questions: p.questions, gameId: p.gameId || null, settings: p.settings || null });
+function cleanSettings(x) {
+  if (!x || typeof x !== 'object') return null;
+  return { title: String(x.title || '').slice(0, 60), lang: x.lang === 'he' ? 'he' : 'en', players: Math.min(100, Math.max(1, parseInt(x.players, 10) || 8)),
+           days: Math.min(365, Math.max(1, parseInt(x.days, 10) || 30)), scoreTable: !!x.scoreTable };
+}
 
 app.post('/api/admin/pack/new', adminOnly, async (req, res) => {
   const lang = req.body.lang === 'he' ? 'he' : 'en';
@@ -745,7 +751,14 @@ app.post('/api/admin/pack/new', adminOnly, async (req, res) => {
     src = t;
   }
   const p = { id: 'pk-' + crypto.randomBytes(5).toString('hex'), kind: 'qpack', template: false, lang, bg: src.bg || 'chanukah', decor: cleanDecor(src.decor),
-              questions: cleanQuestions(src.questions), createdAt: Date.now(), updatedAt: Date.now() };
+              questions: cleanQuestions(src.questions), settings: cleanSettings(req.body.settings), createdAt: Date.now(), updatedAt: Date.now() };
+  const orderKey = String(req.body.orderKey || '');
+  if (orderKey) {   // the draft stays with the order, so closing the editor never loses work
+    const m = (await store.get(metaId(orderKey))) || { id: metaId(orderKey), kind: 'ometa', key: orderKey, sent: false, createdAt: Date.now() };
+    if (m.gameId) return res.status(400).json({ error: 'כבר נוצר משחק להזמנה הזאת' });
+    m.draftPack = p.id; m.updatedAt = Date.now(); await store.set(m.id, m);
+    p.orderKey = orderKey;
+  }
   await store.set(p.id, p); res.json(packView(p));
 });
 app.post('/api/admin/pack/get', adminOnly, async (req, res) => {
@@ -762,10 +775,21 @@ app.post('/api/admin/pack/save', adminOnly, async (req, res) => {
   }
   p.questions = cleanQuestions(req.body.questions); p.bg = req.body.bg === 'plain' ? 'plain' : 'chanukah'; p.decor = cleanDecor(req.body.decor);
   if (req.body.name != null) p.name = String(req.body.name).slice(0, 60);
+  if (req.body.settings) p.settings = cleanSettings(req.body.settings);
   const err = req.body.check ? packProblem(p) : '';
   if (err) return res.status(400).json({ error: err });
   p.updatedAt = Date.now(); await store.set(p.id, p); packs.set(p.id, compilePack(p));
   res.json({ ok: true });
+});
+app.post('/api/admin/pack/preview', adminOnly, async (req, res) => {   // see a custom game with fake players, no phones
+  const p = await store.get(String(req.body.id || ''));
+  if (!p || p.kind !== 'qpack') return res.status(404).json({ error: 'לא נמצא' });
+  packs.set(p.id, compilePack(p));
+  if (!packs.get(p.id).compiled.length) return res.status(400).json({ error: 'אין עדיין שאלות שלמות לתצוגה' });
+  const st = p.settings || {}, lg = (st.lang || p.lang) === 'he' ? 'he' : 'en';
+  const t = makeToken({ id: 'preview-' + crypto.randomBytes(4).toString('hex'), k: 'preview', th: 'hanukkah', lg, pk: p.id,
+                        title: st.title || (lg === 'en' ? 'Preview' : 'תצוגה מקדימה'), max: 8, exp: Date.now() + 86400000 });
+  res.json({ link: `${baseOf(req)}/play.html?t=${t}` });
 });
 app.post('/api/admin/pack/template', adminOnly, async (req, res) => {   // save a copy as a reusable template
   const p = await store.get(String(req.body.id || ''));
