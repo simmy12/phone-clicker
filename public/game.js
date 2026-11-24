@@ -600,13 +600,13 @@ async function loadLang(code) {
   applyTexts();
 }
 (async () => {
-  await loadLang('he');
+  // nothing is shown until the game's own language is loaded, so an English game never flashes Hebrew
+  let lang = 'he';
+  if (TOKEN) { try { const first = await api('/api/game'); if (first.lang) lang = first.lang; } catch {} }
+  await loadLang(lang);
+  document.body.classList.remove('boot');
   $('msgTitle').textContent = t('connecting'); show('msg');
   if (!TOKEN) { $('msgTitle').textContent = t('linkBad'); return; }
-  try {   // pick the game's language before the first screen is drawn
-    const first = await api('/api/game');
-    if (first.lang && first.lang !== 'he') await loadLang(first.lang);
-  } catch {}
   poll(); setInterval(poll, 600);
 })();
 })();

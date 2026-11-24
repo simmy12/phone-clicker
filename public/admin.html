@@ -173,6 +173,10 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
 .ib.del:hover { background:var(--red-bg); }
 .sw { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--muted); white-space:nowrap; margin-top:12px; cursor:pointer; }
 .sw input { accent-color:var(--violet); width:16px; height:16px; }
+.savechip { font-weight:800; font-size:15px; border-radius:30px; padding:8px 16px; background:var(--green-bg); color:#13633a; }
+.savechip.busy { background:#f1f0f6; color:var(--muted); }
+.savechip.bad { background:var(--red-bg); color:#a1222f; }
+.draft { display:inline-block; font-size:12.5px; font-weight:800; color:#7a5b10; background:var(--gold-2); border-radius:8px; padding:4px 10px; }
 .tpls { display:grid; gap:8px; margin-top:10px; }
 .tpl { display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:12px; padding:10px 14px; text-align:right; background:#fff; width:100%; }
 .tpl:hover { border-color:var(--violet); background:#faf8ff; }
@@ -363,6 +367,7 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
       <button class="btn soft" id="qCopy">📤 העתק לאקסל</button>
       <span class="cnt" id="qCount"></span>
       <span class="spacer"></span>
+      <button class="btn gold" id="qPrev">👀 תצוגה מקדימה</button>
       <button class="btn ghost" id="qTpl">⭐ שמור כתבנית</button>
     </div>
     <table class="qt">
@@ -374,7 +379,7 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
     <button class="btn" id="edSave">צור משחק</button>
     <div class="note bad hidden" id="edErr"></div>
     <span class="spacer"></span>
-    <span class="sync" id="edSaved"></span>
+    <span class="savechip" id="edSaved">✓ כל השינויים נשמרו</span>
   </div>
 </div>
 
@@ -469,7 +474,8 @@ function renderOrders() {
     const g = o.game, canEdit = g && !g.used && g.status !== 'finished' && g.status !== 'play';
     const srcTag = o.src === 'manual' ? '<span class="src">ידנית</span>' : o.src === 'page' ? '<span class="src">דף הזמנה</span>' : '';
     let acts;
-    if (!o.links) acts = `<button class="btn sm" data-create="${esc(o.key)}">✨ צור משחק</button>`;
+    if (!o.links && o.draft) acts = `<span class="draft">📝 טיוטה · המשחק עוד לא נוצר</span><button class="btn sm" data-draft="${esc(o.key)}">✏️ המשך עריכה</button>`;
+    else if (!o.links) acts = `<button class="btn sm" data-create="${esc(o.key)}">✨ צור משחק</button>`;
     else acts = `<button class="btn sm" data-cp="real" data-k="${esc(o.key)}">🎮 העתק קישור משחק</button>
       <button class="btn sm soft" data-cp="demo" data-k="${esc(o.key)}">🧪 העתק קישור תרגול</button>
       <button class="btn sm ghost" data-edit="${esc(o.key)}" ${canEdit ? '' : 'disabled title="המשחק כבר התחיל"'}>✏️ ערוך</button>
@@ -485,6 +491,7 @@ function renderOrders() {
       <td><div class="acts">${acts}</div></td></tr>`;
   }).join('');
   document.querySelectorAll('[data-create]').forEach(b => b.onclick = () => openCreate(b.dataset.create));
+  document.querySelectorAll('[data-draft]').forEach(b => b.onclick = () => { const o = ORDERS.find(x => x.key === b.dataset.draft); openEditor({ mode:'create', o, packId: o.draft }); });
   document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEdit(b.dataset.edit));
   document.querySelectorAll('[data-cp]').forEach(b => b.onclick = () => { const o = ORDERS.find(x => x.key === b.dataset.k); copyText(o.links[b.dataset.cp], b.dataset.cp === 'real' ? 'קישור המשחק הועתק ✓' : 'קישור התרגול הועתק ✓'); });
   document.querySelectorAll('[data-sent]').forEach(c => c.onchange = async () => { await post('/api/admin/order/sent', { orderKey: c.dataset.sent, sent: c.checked }); toast(c.checked ? 'סומן כנשלח ✓' : 'הסימון בוטל'); loadOrders(); });
@@ -549,7 +556,8 @@ $('cCustom').onclick = async () => {
     + (Array.isArray(t) ? t : []).map(x => `<button class="tpl" data-from="${esc(x.id)}" data-lang="${x.lang}"><span>⭐</span><b>${esc(x.name)}</b><span>${x.count} שאלות · תבנית</span></button>`).join('');
   document.querySelectorAll('#startList [data-from]').forEach(b => b.onclick = async () => {
     b.disabled = true;
-    const pk = await post('/api/admin/pack/new', { lang: b.dataset.lang, from: b.dataset.from });
+    const pk = await post('/api/admin/pack/new', { lang: b.dataset.lang, from: b.dataset.from, orderKey: CUR.o.key,
+      settings: { title: CUR.o.name, lang: b.dataset.lang, players: CUR.o.players || 8, days: 30, scoreTable: true } });
     b.disabled = false;
     if (pk.error) return toast(pk.error);
     $('mGame').classList.add('hidden');
@@ -568,15 +576,30 @@ async function openEditor({ mode, o, pack, packId }) {
   $('edGame').classList.toggle('hidden', mode === 'template');
   $('qTpl').classList.toggle('hidden', mode === 'template');
   $('edTitle').textContent = mode === 'template' ? `⭐ תבנית: ${pack.name}` : mode === 'editGame' ? '✏️ עריכת משחק אישי' : '✏️ משחק בהתאמה אישית';
-  $('edFor').textContent = o ? `עבור ${o.name}` + (mode === 'editGame' ? ' · הקישורים לא משתנים' : '') : 'שינויים נשמרים לבד';
-  $('edSave').textContent = mode === 'create' ? 'צור משחק' : 'שמור';
-  if (mode === 'create') { $('eTitle').value = o.name; $('ePlayers').value = o.players || 8; $('eDays').value = 30; $('eScore').checked = true; setELang(pack.lang || 'en'); }
+  $('edFor').textContent = (o ? `עבור ${o.name} · ` : '') + (mode === 'editGame' ? 'המשחק כבר נוצר, הקישורים לא משתנים' : mode === 'create' ? 'כל שינוי נשמר לבד' : 'כל שינוי נשמר לבד');
+  $('edSave').textContent = 'צור משחק'; $('edSave').classList.toggle('hidden', mode !== 'create');
+  $('edErr').classList.add('hidden'); setChip('ok');
+  if (mode === 'create') { const st = pack.settings || {}; $('eTitle').value = st.title || o.name; $('ePlayers').value = st.players || o.players || 8;
+    $('eDays').value = st.days || 30; $('eScore').checked = st.scoreTable !== false; setELang(st.lang || pack.lang || 'en'); }
   if (mode === 'editGame') { const g = o.game; $('eTitle').value = g.title || ''; $('ePlayers').value = g.max; $('eScore').checked = !!g.scoreTable; setELang(g.lang || 'en'); }
   $('eDaysWrap').classList.toggle('hidden', mode !== 'create');
   renderLook(); renderQs();
   $('ed').classList.remove('hidden'); document.body.style.overflow = 'hidden';
 }
-$('edClose').onclick = () => { const tpl = ED && ED.mode === 'template'; flushSave(); $('ed').classList.add('hidden'); document.body.style.overflow = ''; ED = null; loadOrders(); if (tpl) loadTemplates(); };
+$('edClose').onclick = async () => {
+  const mode = ED && ED.mode;
+  await flushSave();
+  $('ed').classList.add('hidden'); document.body.style.overflow = ''; ED = null; loadOrders();
+  if (mode === 'template') { loadTemplates(); toast('התבנית נשמרה ✓'); }
+  else if (mode === 'create') toast('נשמר כטיוטה ✓ אפשר להמשיך מתי שתרצי');
+  else if (mode === 'editGame') toast('השינויים נשמרו במשחק ✓ הקישורים נשארו אותו דבר');
+};
+// game details are saved automatically too
+['eTitle', 'ePlayers', 'eDays'].forEach(id => $(id).addEventListener('input', () => ED && autosave()));
+$('eScore').addEventListener('change', () => ED && autosave());
+document.querySelectorAll('#eLang button').forEach(b => b.addEventListener('click', () => ED && autosave()));
+function setChip(st, txt) { const c = $('edSaved'); c.className = 'savechip' + (st === 'busy' ? ' busy' : st === 'bad' ? ' bad' : ''); c.textContent = txt || (st === 'busy' ? 'שומר…' : '✓ כל השינויים נשמרו'); }
+const gameSettings = () => ({ title: $('eTitle').value.trim(), lang: EDL, players: $('ePlayers').value, days: $('eDays').value, scoreTable: $('eScore').checked });
 
 function renderLook() {
   document.querySelectorAll('.bgopt').forEach(b => { b.classList.toggle('on', b.dataset.bg === (ED.pack.bg || 'chanukah')); b.onclick = () => { ED.pack.bg = b.dataset.bg; renderLook(); autosave(); }; });
@@ -653,36 +676,40 @@ $('qCopy').onclick = () => {
 };
 
 /* saving */
-function autosave() { $('edSaved').textContent = 'שומר…'; clearTimeout(autosave.t); autosave.t = setTimeout(doSave, 900); }
+function autosave() { setChip('busy'); clearTimeout(autosave.t); autosave.t = setTimeout(doSave, 700); }
 async function doSave(check) {
-  clearTimeout(autosave.t);
-  const p = ED.pack;
-  const r = await post('/api/admin/pack/save', { id: p.id, questions: p.questions, bg: p.bg, decor: p.decor, check: !!check });
-  $('edSaved').textContent = r.error ? '' : 'נשמר ✓';
+  clearTimeout(autosave.t); autosave.t = null;
+  if (!ED) return {};
+  const p = ED.pack, settings = ED.mode === 'template' ? null : gameSettings();
+  const r = await post('/api/admin/pack/save', { id: p.id, questions: p.questions, bg: p.bg, decor: p.decor, check: !!check, settings });
+  if (!r.error && ED && ED.mode === 'editGame') {   // a game that already exists: its name / players / language change right away
+    const e = await post('/api/admin/order/edit-game', { orderKey: ED.o.key, ...settings });
+    if (e.error) { setChip('bad', '⚠️ ' + e.error); return e; }
+  }
+  if (r.error) setChip('bad', check ? '⚠️ יש מה לתקן' : '⚠️ לא נשמר: ' + r.error); else setChip('ok');
   return r;
 }
-function flushSave() { if (ED && autosave.t) { doSave(); } }
+async function flushSave() { if (ED && autosave.t) await doSave(); }
 $('edSave').onclick = async () => {
   const showErr = t => { $('edErr').textContent = t; $('edErr').classList.remove('hidden'); };
   $('edErr').classList.add('hidden'); $('edSave').disabled = true;
   try {
     const r = await doSave(true);
     if (r.error) return showErr(r.error);
-    if (ED.mode === 'template') { toast('התבנית נשמרה ✓'); return; }
-    const title = $('eTitle').value.trim();
-    if (!title) return showErr('צריך לכתוב שם למשחק');
-    const body = { orderKey: ED.o.key, title, lang: EDL, players: $('ePlayers').value, days: $('eDays').value, scoreTable: $('eScore').checked };
-    if (ED.mode === 'editGame') {
-      const e = await post('/api/admin/order/edit-game', body);
-      if (e.error) return showErr(e.error);
-      toast('השינויים נשמרו ✓'); return;
-    }
+    const body = { orderKey: ED.o.key, ...gameSettings() };
+    if (!body.title) return showErr('צריך לכתוב שם למשחק');
     const g = await post('/api/admin/order/game', { ...body, packId: ED.pack.id });
     if (g.error) return showErr(g.error);
-    const o = ED.o; $('edClose').click();
+    const o = ED.o; ED = null; $('ed').classList.add('hidden'); document.body.style.overflow = ''; loadOrders();
     $('lReal').textContent = g.real; $('lDemo').textContent = g.demo; $('gFor3').textContent = `עבור ${o.name}`;
     step(3); openModal('mGame');
   } finally { $('edSave').disabled = false; }
+};
+$('qPrev').onclick = async () => {
+  const w = window.open('', '_blank');
+  await flushSave();
+  const r = await post('/api/admin/pack/preview', { id: ED.pack.id });
+  if (r.link) w.location = r.link; else { w.close(); toast(r.error || 'שגיאה'); }
 };
 $('qTpl').onclick = async () => {
   const name = prompt('איך לקרוא לתבנית? (למשל: בר מצווה, מסיבת כיתה)');
