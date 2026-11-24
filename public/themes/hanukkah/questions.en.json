@@ -7,7 +7,8 @@
    "The middle one",
    "It doesn't matter"
   ],
-  "correct": 2
+  "correct": 2,
+  "round": 1
  },
  {
   "text": "Which day of Chanukah is called \"Zos Chanukah\"?",
@@ -17,7 +18,8 @@
    "The eighth day",
    "Shabbos Chanukah"
   ],
-  "correct": 3
+  "correct": 3,
+  "round": 1
  },
  {
   "text": "What was the oil jug wearing?",
@@ -28,7 +30,19 @@
    "A ribbon"
   ],
   "correct": 1,
-  "image": "memory/memory-jug.webp"
+  "image": "memory/memory-jug.webp",
+  "round": 1
+ },
+ {
+  "text": "What's your favorite part of Chanukah?",
+  "options": [
+   "Latkes",
+   "Sufganiyos",
+   "Chanukah gelt",
+   "Lighting the menorah"
+  ],
+  "poll": true,
+  "round": 1
  },
  {
   "text": "About how many sufganiyos are sold in Eretz Yisroel each Chanukah season?",
@@ -38,7 +52,8 @@
    "100 million",
    "250 million"
   ],
-  "correct": 2
+  "correct": 2,
+  "round": 1
  },
  {
   "text": "In which mesechta of the Gemara is the miracle of the oil told?",
@@ -49,7 +64,8 @@
    "Rosh Hashanah"
   ],
   "correct": 2,
-  "bonus": true
+  "bonus": true,
+  "round": 1
  },
  {
   "text": "Which oil is the most mehudar for lighting the menorah?",
@@ -59,7 +75,8 @@
    "Sesame oil",
    "Sunflower oil"
   ],
-  "correct": 2
+  "correct": 2,
+  "round": 2
  },
  {
   "text": "Where does the name \"Chanukah\" come from?",
@@ -69,7 +86,8 @@
    "The eighth candle",
    "Mattisyahu ben Chanoch"
   ],
-  "correct": 2
+  "correct": 2,
+  "round": 2
  },
  {
   "text": "Which dreidel was in second place?",
@@ -80,7 +98,8 @@
    "Red"
   ],
   "correct": 1,
-  "image": "memory/memory-race.webp"
+  "image": "memory/memory-race.webp",
+  "round": 2
  },
  {
   "text": "When Shabbos is Rosh Chodesh Teves during Chanukah, how many Sifrei Torah are taken out?",
@@ -90,7 +109,8 @@
    "3",
    "4"
   ],
-  "correct": 3
+  "correct": 3,
+  "round": 2
  },
  {
   "text": "Who composed \"Maoz Tzur\"? (Hint: his name is hidden in the first letters of the stanzas)",
@@ -101,7 +121,8 @@
    "Rashi"
   ],
   "correct": 3,
-  "bonus": true
+  "bonus": true,
+  "round": 2
  },
  {
   "text": "Which month begins in the middle of Chanukah?",
@@ -111,7 +132,8 @@
    "Shvat",
    "Cheshvan"
   ],
-  "correct": 2
+  "correct": 2,
+  "round": 3
  },
  {
   "text": "A Chanukah candle went out by itself right after lighting. What is the basic halacha?",
@@ -121,7 +143,8 @@
    "There is no obligation to relight it",
    "Relight the whole menorah"
   ],
-  "correct": 3
+  "correct": 3,
+  "round": 3
  },
  {
   "text": "What was under the frying pan?",
@@ -132,7 +155,19 @@
    "Nothing"
   ],
   "correct": 1,
-  "image": "memory/memory-latkes.webp"
+  "image": "memory/memory-latkes.webp",
+  "round": 3
+ },
+ {
+  "text": "Which sufganiya is the best?",
+  "options": [
+   "Jelly",
+   "Chocolate",
+   "Custard",
+   "Plain with powdered sugar"
+  ],
+  "poll": true,
+  "round": 3
  },
  {
   "text": "The gematria of the dreidel letters Nun Gimmel Hei Shin equals the gematria of:",
@@ -142,7 +177,8 @@
    "Moshiach",
    "Shalom"
   ],
-  "correct": 3
+  "correct": 3,
+  "round": 3
  },
  {
   "text": "Which parsha is read from the Torah on Chanukah?",
@@ -153,7 +189,8 @@
    "Vayakhel"
   ],
   "correct": 2,
-  "bonus": true
+  "bonus": true,
+  "round": 3
  },
  {
   "text": "What do we start saying in Shemoneh Esrei in America around December 4–5?",
@@ -163,7 +200,8 @@
    "V'sein Tal U'matar",
    "Yaaleh V'yavo"
   ],
-  "correct": 3
+  "correct": 3,
+  "round": 4
  },
  {
   "text": "If you forgot \"Al Hanisim\" and remembered after finishing that bracha:",
@@ -173,7 +211,8 @@
    "Don't go back",
    "Say it only at the very end"
   ],
-  "correct": 3
+  "correct": 3,
+  "round": 4
  },
  {
   "text": "What was wrong in the picture?",
@@ -184,7 +223,8 @@
    "The menorah was upside down"
   ],
   "correct": 1,
-  "image": "memory/memory-menorah.webp"
+  "image": "memory/memory-menorah.webp",
+  "round": 4
  },
  {
   "text": "Which Tehillim, \"Mizmor Shir Chanukas HaBayis\", is customarily said on Chanukah?",
@@ -194,7 +234,8 @@
    "Kapitel 91",
    "Kapitel 121"
   ],
-  "correct": 2
+  "correct": 2,
+  "round": 4
  },
  {
   "text": "What is the highest a Chanukah candle may be placed and still be kosher?",
@@ -205,7 +246,8 @@
    "There is no limit"
   ],
   "correct": 3,
-  "bonus": true
+  "bonus": true,
+  "round": 4
  },
  {
   "text": "About how many years before the Churban of the Second Beis Hamikdash was the Chanukah miracle?",
@@ -215,7 +257,8 @@
    "230",
    "400"
   ],
-  "correct": 3
+  "correct": 3,
+  "round": 5
  },
  {
   "text": "About how long from the start of the Chashmonaim's revolt until the Beis Hamikdash was purified?",
@@ -225,7 +268,8 @@
    "7 years",
    "10 years"
   ],
-  "correct": 2
+  "correct": 2,
+  "round": 5
  },
  {
   "text": "How many dreidels were flying in the air?",
@@ -236,7 +280,19 @@
    "6"
   ],
   "correct": 3,
-  "image": "memory/memory-chef.webp"
+  "image": "memory/memory-chef.webp",
+  "round": 5
+ },
+ {
+  "text": "When is the best time to play dreidel?",
+  "options": [
+   "Right after lighting",
+   "At the Chanukah seudah",
+   "With the cousins",
+   "All night long!"
+  ],
+  "poll": true,
+  "round": 5
  },
  {
   "text": "On Erev Shabbos Chanukah, which do we light first?",
@@ -246,7 +302,8 @@
    "Both together",
    "It doesn't matter"
   ],
-  "correct": 1
+  "correct": 1,
+  "round": 5
  },
  {
   "text": "Which of Mattisyahu's sons was killed when an elephant fell on him in battle?",
@@ -257,6 +314,7 @@
    "Shimon"
   ],
   "correct": 2,
-  "bonus": true
+  "bonus": true,
+  "round": 5
  }
 ]
