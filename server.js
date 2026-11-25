@@ -562,11 +562,12 @@ app.get('/api/health', async (req, res) => {
       lineCache.ok = nums.some(n => (n.voiceUrl || '').startsWith(baseOf(req)) && n.voiceUrl.endsWith('/voice'));
     } catch { lineCache.ok = false; }
   }
-  res.json({ server: true, line: client ? lineCache.ok : null, storage: store.kind });
+  res.json({ server: true, line: client ? lineCache.ok : null, storage: store.kind, pay: pay.enabled ? (pay.test ? 'test' : 'live') : 'off' });
 });
 
 // --- admin ---
 function adminOnly(req, res, next) { if (req.body.key !== ADMIN_KEY) return res.status(401).json({ error: 'סיסמה שגויה' }); next(); }
+const pay = require('./payments')(app, { store, adminOnly, baseOf, secret: SECRET, getBase: () => publicBase });   // card payments (off until RIVHIT_GROUP_TOKEN is set)
 
 app.post('/api/admin/create', adminOnly, (req, res) => {
   const theme = loadTheme(req.body.theme || 'hanukkah') ? (req.body.theme || 'hanukkah') : 'hanukkah';
@@ -626,7 +627,7 @@ async function sheetOrders(force) {
 }
 const metaId = key => 'om-' + key;
 async function allOrders(force) {
-  const [sheet, manual, page, metas] = await Promise.all([sheetOrders(force), store.byKind('morder'), store.byKind('order'), store.byKind('ometa')]);
+  const [sheet, manual, page, metas, pays] = await Promise.all([sheetOrders(force), store.byKind('morder'), store.byKind('order'), store.byKind('ometa'), pay.byOrder()]);
   const meta = Object.fromEntries(metas.map(m => [m.key, m]));
   const list = [
     ...sheet.data,
@@ -644,7 +645,8 @@ async function allOrders(force) {
     const played = game && (game.status === 'finished' || game.used);
     const status = !m || !m.gameId ? 'new' : played ? 'played' : m.sent ? 'sent' : 'created';
     out.push({ ...o, status, sent: !!(m && m.sent), links: m && m.gameId ? { real: m.realLink, demo: m.demoLink } : null, game,
-               draft: m && !m.gameId && m.draftPack ? m.draftPack : null });
+               draft: m && !m.gameId && m.draftPack ? m.draftPack : null,
+               pay: pays[o.key] ? { status: pays[o.key].status, amount: pays[o.key].amount, link: `${publicBase}/pay/${pays[o.key].id}`, doc: pays[o.key].docNum || '', error: pays[o.key].lastError || '' } : null });
   }
   const rank = { new: 0, created: 1, sent: 2, played: 3 };
   out.sort((a, b) => rank[a.status] - rank[b.status] || (b.date || 0) - (a.date || 0));
