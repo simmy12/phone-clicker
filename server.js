@@ -1077,28 +1077,44 @@ async function sheetCall(body) {
   return j;
 }
 function linksMail(o, m) {
+  // A table layout with inline styles, so it looks the same in Gmail, Outlook and on phones.
   const first = escH(String(o.name || '').split(/\s+/)[0] || 'there');
-  const btn = (href, txt, bg) => `<a href="${href}" style="display:inline-block;background:${bg};color:#0b1433;font-weight:bold;padding:12px 22px;border-radius:10px;text-decoration:none">${txt}</a>`;
+  const NAVY = '#0b1433', GOLD = '#e9b949', INK = '#1d1b3a', MUTED = '#6b6890';
+  const button = (href, txt, bg, fg) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:14px 0 0"><tr><td style="background:${bg};border-radius:12px">
+      <a href="${href}" style="display:inline-block;padding:14px 26px;font:bold 16px Arial,sans-serif;color:${fg};text-decoration:none;border-radius:12px">${txt}</a></td></tr></table>`;
+  const card = (badge, title, text, href, txt, bg, fg) => `<tr><td style="padding:0 28px 16px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e6e3f3;border-radius:14px"><tr><td style="padding:20px 22px">
+        <div style="font:bold 12px Arial,sans-serif;letter-spacing:1px;color:${MUTED};text-transform:uppercase">${badge}</div>
+        <div style="font:bold 19px Arial,sans-serif;color:${INK};margin-top:4px">${title}</div>
+        <div style="font:15px/1.5 Arial,sans-serif;color:${MUTED};margin-top:6px">${text}</div>
+        ${button(href, txt, bg, fg)}</td></tr></table></td></tr>`;
+  const step = (n, t) => `<tr><td width="34" valign="top" style="padding:0 0 12px"><div style="width:26px;height:26px;border-radius:13px;background:${GOLD};color:${NAVY};font:bold 14px/26px Arial,sans-serif;text-align:center">${n}</div></td>
+      <td valign="top" style="padding:3px 0 12px;font:15px/1.5 Arial,sans-serif;color:${INK}">${t}</td></tr>`;
   return {
-    subject: `Your Tricky Trivia links 🎉 (order ${o.orderId})`,
-    html: `<div style="font-family:Arial,sans-serif;font-size:16px;line-height:1.55;color:#1d1b3a;max-width:560px">
-      <h2 style="margin:0 0 10px">Hi ${first}, your Tricky Trivia is ready! 🕎</h2>
-      <p>Thank you for your order. Your game is set for up to <b>${o.players} players</b>.</p>
-      <h3 style="margin:22px 0 6px">1. Practice link</h3>
-      <p style="margin:0 0 10px">Try it first, so you know how everything works. You can use it up to 2 times.</p>
-      ${btn(m.demoLink, '🧪 Open the practice game', '#dfe5ff')}
-      <h3 style="margin:22px 0 6px">2. Your game link</h3>
-      <p style="margin:0 0 10px">For the real game. It works <b>one time</b> and is valid for 30 days.</p>
-      ${btn(m.realLink, '🎮 Open your game', '#e9b949')}
-      <h3 style="margin:24px 0 6px">How to play</h3>
-      <ol style="padding-left:20px;margin:0">
-        <li>Open the game link on a computer, ideally connected to a big screen.</li>
-        <li>Type in the players' names and phone numbers.</li>
-        <li>Everyone calls <b>${escH(PHONE_NUMBER)}</b> from their own phone (kosher phones work too).</li>
-        <li>When a question appears, press 1, 2, 3 or 4 on the phone. Right and fast = more points!</li>
-      </ol>
-      <p style="margin-top:22px">Questions? Just email us at <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
-      <p>Happy Chanukah! ✨<br>Tricky Trivia</p></div>`,
+    subject: `Your Tricky Trivia game is ready 🎉 (order ${o.orderId})`,
+    html: `<div style="background:#f3f1fb;padding:24px 10px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden">
+  <tr><td style="background:${NAVY};padding:30px 28px;text-align:center">
+    <div style="font-size:34px;line-height:1">🕎</div>
+    <div style="font:bold 26px Arial,sans-serif;color:${GOLD};margin-top:10px">Tricky Trivia</div>
+    <div style="font:15px Arial,sans-serif;color:#dfe5ff;margin-top:6px">The Chanukah phone game show</div></td></tr>
+  <tr><td style="padding:28px 28px 8px">
+    <div style="font:bold 22px Arial,sans-serif;color:${INK}">Hi ${first}, your game is ready!</div>
+    <div style="font:16px/1.55 Arial,sans-serif;color:${MUTED};margin-top:8px">Thank you for your order. Your game is set for up to <b style="color:${INK}">${o.players} players</b>. Here are your two links:</div></td></tr>
+  <tr><td style="height:12px"></td></tr>
+  ${card('Step 1 · Try it out', 'Practice game', 'See how everything works before the big night. You can use this link up to 2 times.', m.demoLink, 'Open the practice game', '#e9e5ff', NAVY)}
+  ${card('Step 2 · The real thing', 'Your game', 'Use this link for the real game. It works <b>one time</b> and is valid for 30 days.', m.realLink, 'Open your game →', GOLD, NAVY)}
+  <tr><td style="padding:10px 28px 4px"><div style="font:bold 18px Arial,sans-serif;color:${INK}">How to play</div></td></tr>
+  <tr><td style="padding:10px 28px 8px"><table role="presentation" cellpadding="0" cellspacing="0">
+    ${step(1, 'Open the game link on a computer, ideally connected to a big screen.')}
+    ${step(2, "Type in the players' names and phone numbers.")}
+    ${step(3, `Everyone calls <b>${escH(PHONE_NUMBER)}</b> from their own phone. Kosher phones work too.`)}
+    ${step(4, 'A question appears on the screen. Press 1, 2, 3 or 4 on your phone. Right and fast wins more points!')}
+  </table></td></tr>
+  <tr><td style="padding:8px 28px 28px"><div style="background:#fbf6ea;border-radius:12px;padding:16px 18px;font:14px/1.5 Arial,sans-serif;color:${INK}">
+    Questions? Write to us at <a href="mailto:${CONTACT_EMAIL}" style="color:#5b3fd6">${CONTACT_EMAIL}</a>.</div></td></tr>
+  <tr><td style="background:${NAVY};padding:18px;text-align:center;font:14px Arial,sans-serif;color:${GOLD}">Happy Chanukah! ✨</td></tr>
+</table></div>`,
   };
 }
 const fulfilling = new Set();
