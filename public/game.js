@@ -361,6 +361,8 @@ function renderLobby(changed) {
   const prevTested = prevS && prevS.status === 'lobby' ? prevS.players.filter(p => p.tested).length : tested;
   if (tested > prevTested) audio.sfx('coin');
   $('testHint').classList.toggle('hidden', on === 0);
+  const n = s().players.length;   // many players: smaller name tags so they all fit above the buttons
+  $('lobbyChips').className = n > 60 ? 'huge' : n > 24 ? 'many' : n > 12 ? 'mid' : '';
   if ($('lobbyChips').dataset.h !== html) { $('lobbyChips').innerHTML = html; $('lobbyChips').dataset.h = html; }
 }
 const s = () => S;
@@ -603,7 +605,7 @@ async function poll() {
 }
 
 async function loadLang(code) {
-  try { L = await (await fetch('lang/' + code + '.json?v=13')).json(); } catch { L = {}; }
+  try { L = await (await fetch('lang/' + code + '.json?v=14')).json(); } catch { L = {}; }
   applyTexts();
 }
 (async () => {

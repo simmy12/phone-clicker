@@ -574,3 +574,15 @@ input, select { font-family:"Rubik"; font-weight:600; border:2px solid rgba(255,
 
 /* v11: wait for the game's language before showing any text */
 .boot #welcome, .boot .screen, .boot #toolbar { visibility:hidden; }
+
+/* v12: lobby with many players (13-100): smaller tags; from 25 the colour alone shows the status */
+#lobbyChips.mid { top:650px; gap:10px 12px; }
+#lobbyChips.mid .pchip { font-size:24px; padding:6px 16px 6px 12px; gap:8px; }
+#lobbyChips.mid .pchip b { font-size:20px; } #lobbyChips.mid .pchip small { font-size:15px; padding:2px 8px; }
+#lobbyChips.many, #lobbyChips.huge { top:630px; inset-inline:110px; gap:8px 10px; }
+#lobbyChips.many .pchip { font-size:21px; padding:5px 14px 5px 10px; gap:6px; }
+#lobbyChips.huge .pchip { font-size:16px; padding:3px 10px 3px 8px; gap:5px; border-width:2px; }
+#lobbyChips.many .pchip b { font-size:17px; } #lobbyChips.huge .pchip b { font-size:13px; }
+#lobbyChips.many .pchip small, #lobbyChips.huge .pchip small { display:none; }
+#lobbyChips.many .pchip.on:not(.tested), #lobbyChips.huge .pchip.on:not(.tested) { border-color:#f59e0b; background:linear-gradient(180deg, rgba(245,158,11,.3), rgba(60,30,5,.75)); box-shadow:0 0 14px rgba(245,158,11,.5); }
+#lobbyChips.many .pchip.on:not(.tested) b, #lobbyChips.huge .pchip.on:not(.tested) b { color:#fbbf24; }
