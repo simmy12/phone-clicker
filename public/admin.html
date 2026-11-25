@@ -190,6 +190,24 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
   main { padding:18px 14px; }
   th:nth-child(5), td:nth-child(5) { display:none; }
 }
+
+/* money */
+.mtop { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-bottom:18px; }
+.mbox { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; }
+.mbox small { color:var(--muted); font-weight:500; font-size:14px; }
+.mbox .v { font-size:26px; font-weight:800; margin-top:4px; line-height:1.25; }
+.mbox .v span { display:block; text-align:right; }
+.mbox.in .v { color:var(--green); } .mbox.out .v { color:var(--red); }
+.madd { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:18px; }
+.madd .grid { display:grid; grid-template-columns:auto 150px 130px 100px 170px 1fr auto; gap:10px; align-items:end; }
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.seg button { border:0; background:#fff; padding:9px 14px; font-weight:700; }
+.seg button.on.in { background:var(--green); color:#fff; } .seg button.on.out { background:var(--red); color:#fff; }
+.amt-in { color:var(--green); font-weight:700; white-space:nowrap; } .amt-out { color:var(--red); font-weight:700; white-space:nowrap; }
+.mbar { display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+#mMonths td span { display:block; }
+.mlog { margin-top:12px; font-size:13.5px; color:var(--muted); line-height:1.7; }
+@media (max-width:1100px) { .madd .grid { grid-template-columns:1fr 1fr; } .mtop { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -210,6 +228,7 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
     <button class="nav on" data-v="orders">🛒 הזמנות <span class="n hidden" id="nNew"></span></button>
     <button class="nav" data-v="games">🎮 כל המשחקים</button>
     <button class="nav" data-v="templates">⭐ תבניות</button>
+    <button class="nav" data-v="money">💰 כספים</button>
     <button class="nav" data-v="settings">⚙️ הגדרות</button>
     <div class="foot">יתרה ב-Twilio<b id="bal">—</b></div>
   </aside>
@@ -250,6 +269,36 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
       <div class="tbl"><table><thead><tr><th>שם התבנית</th><th style="text-align:center">שאלות</th><th>עודכן</th><th>פעולות</th></tr></thead><tbody id="tRows"></tbody></table></div>
     </section>
 
+    <!-- money -->
+    <section id="v-money" class="hidden">
+      <div class="head"><h1>כספים</h1></div>
+      <div class="mtop">
+        <div class="mbox in"><small>הכנסות</small><div class="v" id="mIn">—</div></div>
+        <div class="mbox out"><small>הוצאות</small><div class="v" id="mOut">—</div></div>
+        <div class="mbox"><small>רווח</small><div class="v" id="mNet">—</div></div>
+      </div>
+      <div class="madd">
+        <div class="grid">
+          <div><label class="f">סוג</label><div class="seg" id="mType"><button class="on in" data-t="in">+ הכנסה</button><button class="out" data-t="out">− הוצאה</button></div></div>
+          <div><label class="f">תאריך</label><input class="in" id="mDate" type="date"></div>
+          <div><label class="f">סכום</label><input class="in" id="mAmt" type="number" min="0" step="0.01" placeholder="0"></div>
+          <div><label class="f">מטבע</label><select class="in" id="mCur"><option value="USD">$ דולר</option><option value="ILS">₪ שקל</option></select></div>
+          <div><label class="f">קטגוריה</label><input class="in" id="mCat" list="mCats" placeholder="בחרי או כתבי"><datalist id="mCats"></datalist></div>
+          <div><label class="f">פירוט</label><input class="in" id="mNote" placeholder="למשל: משפחת כהן, 12 משתתפים"></div>
+          <div><button class="btn" id="mSave">הוסף</button></div>
+        </div>
+        <div class="row hidden" id="mEditBar" style="margin-top:10px"><span class="notes" style="max-width:none">עורכת שורה קיימת</span><button class="btn sm ghost" id="mCancel">ביטול עריכה</button></div>
+      </div>
+      <div class="mbar">
+        <label class="f" style="margin:0">חודש:</label>
+        <select class="in" id="mMonth" style="width:auto"></select>
+        <button class="btn sm ghost" id="mCsv">⬇ הורדה לאקסל</button>
+      </div>
+      <div class="tbl"><table><thead><tr><th>תאריך</th><th>סוג</th><th>קטגוריה</th><th>פירוט</th><th>סכום</th><th style="width:190px"></th></tr></thead><tbody id="mRows"></tbody></table></div>
+      <h2 style="margin:28px 0 10px;font-size:19px">סיכום לפי חודשים</h2>
+      <div class="tbl"><table><thead><tr><th>חודש</th><th>הכנסות</th><th>הוצאות</th><th>רווח</th></tr></thead><tbody id="mMonths"></tbody></table></div>
+    </section>
+
     <!-- settings -->
     <section id="v-settings" class="hidden">
       <div class="head"><h1>הגדרות</h1></div>
@@ -263,6 +312,20 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
           <input class="in" id="sKey" dir="ltr" placeholder="מופיע בראש הסקריפט">
           <div class="row" style="margin-top:14px"><button class="btn" id="sSave">שמור ובדוק חיבור</button></div>
           <div class="note hidden" id="sNote"></div>
+        </div>
+        <div class="card">
+          <h2>📧 מייל על כל הזמנה חדשה</h2>
+          <p>כשנכנסת הזמנה של טריוויה, נשלח מייל עם כל הפרטים. המיילים יוצאים מ-landsyitzur@gmail.com.</p>
+          <label class="f">כתובת הסקריפט של המיילים (מסתיימת ב-exec/)</label>
+          <input class="in" id="eUrl" dir="ltr" placeholder="https://script.google.com/macros/s/.../exec">
+          <label class="f">מפתח סודי</label>
+          <input class="in" id="eKey" dir="ltr" placeholder="מופיע בראש הסקריפט">
+          <label class="f">מי מקבל את המיילים (כתובת בכל שורה)</label>
+          <textarea class="in" id="eTo" dir="ltr" rows="3"></textarea>
+          <label class="row" style="margin-top:10px;font-size:14px;gap:8px"><input type="checkbox" id="eOff"> להפסיק זמנית לשלוח מיילים</label>
+          <div class="row" style="margin-top:14px"><button class="btn" id="eSave">שמור</button><button class="btn soft" id="eTest">שלח מייל בדיקה</button></div>
+          <div class="note hidden" id="eNote"></div>
+          <div class="mlog" id="eLog"></div>
         </div>
         <div class="card">
           <h2>💰 יתרה ב-Twilio</h2>
@@ -443,8 +506,8 @@ $('pw').onkeydown = e => { if (e.key === 'Enter') $('pwGo').click(); };
 document.querySelectorAll('.nav').forEach(b => b.onclick = () => view(b.dataset.v));
 function view(v) {
   document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.v === v));
-  ['orders','games','templates','settings'].forEach(x => $('v-' + x).classList.toggle('hidden', x !== v));
-  if (v === 'games') loadGames(); if (v === 'settings') loadSettings(); if (v === 'templates') loadTemplates();
+  ['orders','games','templates','money','settings'].forEach(x => $('v-' + x).classList.toggle('hidden', x !== v));
+  if (v === 'games') loadGames(); if (v === 'settings') loadSettings(); if (v === 'templates') loadTemplates(); if (v === 'money') loadMoney();
 }
 
 /* orders */
@@ -785,8 +848,110 @@ async function loadGames() {
   document.querySelectorAll('#gRows [data-score]').forEach(b => b.onclick = () => scoreImage(b.dataset.score));
 }
 
+
+/* new-order emails */
+async function loadMail() {
+  const r = await post('/api/admin/mail');
+  $('eUrl').value = r.mailUrl || ''; $('eTo').value = (r.notifyTo || []).join('\n'); $('eOff').checked = !!r.off;
+  $('eKey').value = ''; $('eKey').placeholder = r.hasKey ? '•••••• (שמור. השאירי ריק כדי לא לשנות)' : 'מופיע בראש הסקריפט';
+  const log = r.log || [];
+  $('eLog').innerHTML = !r.mailUrl ? '' : !r.started ? 'המערכת תתחיל לבדוק הזמנות חדשות בעוד כמה דקות.' :
+    log.length ? '<b>מיילים אחרונים:</b><br>' + log.slice(0, 6).map(l => `${l.ok ? '✓' : '⚠️'} ${fmtDate(l.at)} · ${esc(l.name || '')}${l.ok ? '' : ' · לא נשלח: ' + esc(l.error)}`).join('<br>') :
+    '✓ פעיל. עוד לא נכנסו הזמנות חדשות מאז החיבור.';
+}
+function mailNote(ok, text) { $('eNote').className = 'note ' + (ok ? 'ok' : 'bad'); $('eNote').textContent = text; }
+async function saveMail() {
+  return post('/api/admin/mail', { save: true, mailUrl: $('eUrl').value, mailKey: $('eKey').value, notifyTo: $('eTo').value, off: $('eOff').checked });
+}
+$('eSave').onclick = async () => { $('eSave').disabled = true; await saveMail().finally(() => { $('eSave').disabled = false; }); mailNote(true, '✓ נשמר'); loadMail(); };
+$('eTest').onclick = async () => {
+  $('eTest').disabled = true; await saveMail();
+  const r = await post('/api/admin/mail', { test: true }).finally(() => { $('eTest').disabled = false; });
+  mailNote(r.ok, r.ok ? `✓ נשלח מייל בדיקה אל: ${r.to.join(', ')}. בדקי את התיבה (גם בספאם).` : `המייל לא נשלח: ${r.error}`);
+  loadMail();
+};
+
+/* money */
+let MONEY = [], MTYPE = 'in', MEDIT = null;
+const CATS = { in: ['הזמנה', 'משחק בהתאמה אישית', 'אחר'], out: ['Twilio', 'Render', 'פרסום', 'עיצוב', 'עמלות תשלום', 'אחר'] };
+const SYM = { USD: '$', ILS: '₪' };
+const money = (n, c) => '\u2066' + (n < 0 ? '-' : '') + SYM[c] + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + '\u2069';
+const monthKey = ms => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+const monthName = k => { const [y, m] = k.split('-'); return new Date(+y, +m - 1, 1).toLocaleDateString('he-IL', { month: 'long', year: 'numeric' }); };
+const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+function setMType(t) {
+  MTYPE = t; document.querySelectorAll('#mType button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  $('mCats').innerHTML = CATS[t].map(c => `<option value="${c}">`).join('');
+}
+document.querySelectorAll('#mType button').forEach(b => b.onclick = () => setMType(b.dataset.t));
+function resetMoneyForm() {
+  MEDIT = null; $('mAmt').value = ''; $('mNote').value = ''; $('mCat').value = ''; $('mDate').value = todayStr();
+  $('mSave').textContent = 'הוסף'; $('mEditBar').classList.add('hidden');
+}
+async function loadMoney() {
+  if (!$('mDate').value) { $('mDate').value = todayStr(); setMType(MTYPE); }
+  const r = await post('/api/admin/money'); MONEY = r.entries || []; renderMoney();
+}
+function sums(list) {   // totals per currency
+  const t = {};
+  list.forEach(e => { const x = t[e.cur] = t[e.cur] || { in: 0, out: 0 }; x[e.type] += e.amount; });
+  return t;
+}
+const showSum = (t, f) => { const cs = Object.keys(t).sort(); return cs.length ? cs.map(c => `<span dir="ltr">${money(f(t[c]), c)}</span>`).join('') : '<span>0</span>'; };
+function renderMoney() {
+  const months = [...new Set(MONEY.map(e => monthKey(e.date)))].sort().reverse();
+  const sel = $('mMonth').value || 'all';
+  $('mMonth').innerHTML = `<option value="all">הכל</option>` + months.map(k => `<option value="${k}">${monthName(k)}</option>`).join('');
+  $('mMonth').value = months.includes(sel) || sel === 'all' ? sel : 'all';
+  const list = $('mMonth').value === 'all' ? MONEY : MONEY.filter(e => monthKey(e.date) === $('mMonth').value);
+  const t = sums(list);
+  $('mIn').innerHTML = showSum(t, x => x.in); $('mOut').innerHTML = showSum(t, x => x.out); $('mNet').innerHTML = showSum(t, x => x.in - x.out);
+  $('mRows').innerHTML = list.length ? list.map(e => `<tr>
+      <td>${new Date(e.date).toLocaleDateString('he-IL')}</td>
+      <td>${e.type === 'in' ? '<span class="amt-in">+ הכנסה</span>' : '<span class="amt-out">− הוצאה</span>'}</td>
+      <td>${esc(e.cat)}</td><td class="notes" style="max-width:340px">${esc(e.note)}</td>
+      <td class="${e.type === 'in' ? 'amt-in' : 'amt-out'}"><span dir="ltr">${money(e.amount, e.cur)}</span></td>
+      <td><div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn sm ghost" data-medit="${e.id}">עריכה</button><button class="btn sm danger" data-mdel="${e.id}">מחיקה</button></div></td></tr>`).join('')
+    : `<tr><td colspan="6"><div class="empty"><b>עוד אין כאן כלום</b>למעלה מוסיפים הכנסה או הוצאה.</div></td></tr>`;
+  $('mMonths').innerHTML = months.length ? months.map(k => {
+    const s = sums(MONEY.filter(e => monthKey(e.date) === k));
+    return `<tr><td><b>${monthName(k)}</b></td><td class="amt-in">${showSum(s, x => x.in)}</td><td class="amt-out">${showSum(s, x => x.out)}</td><td><b>${showSum(s, x => x.in - x.out)}</b></td></tr>`;
+  }).join('') : `<tr><td colspan="4" class="notes" style="padding:14px">הסיכום יופיע כאן אחרי השורה הראשונה.</td></tr>`;
+  document.querySelectorAll('[data-mdel]').forEach(b => b.onclick = async () => {
+    const e = MONEY.find(x => x.id === b.dataset.mdel);
+    if (!confirm(`למחוק את השורה: ${e.cat || ''} ${money(e.amount, e.cur)}?`)) return;
+    await post('/api/admin/money', { del: e.id }); toast('נמחק ✓'); if (MEDIT === e.id) resetMoneyForm(); loadMoney();
+  });
+  document.querySelectorAll('[data-medit]').forEach(b => b.onclick = () => {
+    const e = MONEY.find(x => x.id === b.dataset.medit); MEDIT = e.id; setMType(e.type);
+    const d = new Date(e.date); $('mDate').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    $('mAmt').value = e.amount; $('mCur').value = e.cur; $('mCat').value = e.cat; $('mNote').value = e.note;
+    $('mSave').textContent = 'שמור שינוי'; $('mEditBar').classList.remove('hidden'); window.scrollTo({ top: 0, behavior: 'smooth' }); $('mAmt').focus();
+  });
+}
+$('mMonth').onchange = renderMoney;
+$('mCancel').onclick = resetMoneyForm;
+$('mSave').onclick = async () => {
+  if (!(parseFloat($('mAmt').value) > 0)) { toast('צריך לכתוב סכום'); $('mAmt').focus(); return; }
+  $('mSave').disabled = true;
+  const r = await post('/api/admin/money', { add: true, id: MEDIT, type: MTYPE, date: $('mDate').value + 'T12:00:00', amount: $('mAmt').value, cur: $('mCur').value, cat: $('mCat').value, note: $('mNote').value })
+    .finally(() => { $('mSave').disabled = false; });
+  if (r.error) { toast(r.error); return; }
+  toast(MEDIT ? 'השינוי נשמר ✓' : 'נוסף ✓'); localStorage.setItem('moneyCur', $('mCur').value); resetMoneyForm(); loadMoney();
+};
+$('mAmt').onkeydown = $('mNote').onkeydown = e => { if (e.key === 'Enter') $('mSave').click(); };
+$('mCur').value = localStorage.getItem('moneyCur') || 'USD';
+$('mCsv').onclick = () => {
+  const list = $('mMonth').value === 'all' ? MONEY : MONEY.filter(e => monthKey(e.date) === $('mMonth').value);
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const rows = [['תאריך', 'סוג', 'קטגוריה', 'פירוט', 'סכום', 'מטבע']].concat(list.map(e => [new Date(e.date).toLocaleDateString('he-IL'), e.type === 'in' ? 'הכנסה' : 'הוצאה', e.cat, e.note, e.type === 'in' ? e.amount : -e.amount, e.cur]));
+  const blob = new Blob(['﻿' + rows.map(r => r.map(q).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'כספים-' + ($('mMonth').value === 'all' ? 'הכל' : $('mMonth').value) + '.csv'; a.click();
+};
+
 /* settings */
 async function loadSettings() {
+  loadMail();
   const r = await post('/api/admin/settings');
   $('sUrl').value = r.sheetUrl || ''; $('sKey').placeholder = r.hasKey ? '•••••• (שמור. השאירי ריק כדי לא לשנות)' : 'מופיע בראש הסקריפט';
 }

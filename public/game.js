@@ -333,11 +333,12 @@ function render() {
   else if (s.status === 'lobby') renderLobby(changed);
   else if (s.status === 'finished') { if (changed) renderFinal(); }
   else if (s.phase === 'intro') { if (changed) renderIntro(); }
-  else if (s.phase === 'memory') { if (changed) renderMemory(); }
+  else if (s.phase === 'memory') { if (changed) renderMemory(); else if (!!s.paused !== !!render.wasPaused) memBarRun(); }
   else if (s.phase === 'question') renderQuestion(changed);
   else if (s.phase === 'reveal') { if (changed) renderReveal(); }
   else if (s.phase === 'board') { if (changed) renderBoard(); }
   if (s.status !== 'finished') fx.lights(s.phase === 'board');
+  render.wasPaused = !!s.paused;
   prevKey = key;
 }
 
@@ -411,9 +412,15 @@ function countdown321() {
 
 function renderMemory() {
   show('memory'); audio.play(gameTrack()); audio.sfx('whoosh');
-  $('memImg').src = imgSrc(S.question.image);
-  const bar = $('memBar'), left = S.remainingMs || 8000;
-  bar.style.transition = 'none'; bar.style.width = '100%';
+  const img = $('memImg'), src = imgSrc(S.question.image);
+  img.onerror = () => { if (!img.dataset.retry) { img.dataset.retry = 1; setTimeout(() => { img.src = src + (src.includes('?') ? '&' : '?') + 'r=' + Date.now(); }, 400); } };   // a picture that failed to load gets one more try
+  delete img.dataset.retry; img.src = src;
+  memBarRun();
+}
+function memBarRun() {   // the bar under the picture shrinks with the time left, and stands still while the game is paused
+  const bar = $('memBar'), len = S.phaseLen || 8000, left = S.remainingMs == null ? len : S.remainingMs;
+  bar.style.transition = 'none'; bar.style.width = (100 * left / len) + '%';
+  if (S.paused) return;
   requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = `width ${left}ms linear`; bar.style.width = '0%'; }));
 }
 
@@ -596,7 +603,7 @@ async function poll() {
 }
 
 async function loadLang(code) {
-  try { L = await (await fetch('lang/' + code + '.json?v=12')).json(); } catch { L = {}; }
+  try { L = await (await fetch('lang/' + code + '.json?v=13')).json(); } catch { L = {}; }
   applyTexts();
 }
 (async () => {
