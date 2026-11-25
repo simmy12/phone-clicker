@@ -12,10 +12,11 @@
 //   RIVHIT_GROUP_TOKEN   the payment page identifier from iCredit (GroupPrivateToken)
 //   RIVHIT_TEST=1        use iCredit's test environment (fake money). Leave out on the live server.
 //   RIVHIT_EXEMPT_VAT=1  documents without VAT (only after the accountant confirms)
+//   SITE_ORIGINS         the website's own address, if it is not on netlify.app (where to send the customer back after paying)
 
 const crypto = require('crypto');
 
-module.exports = function payments(app, { store, adminOnly, baseOf, secret, getBase }) {
+module.exports = function payments(app, { store, adminOnly, baseOf, secret, getBase, onPaid }) {
   const TOKEN = process.env.RIVHIT_GROUP_TOKEN || '';
   const TEST = process.env.RIVHIT_TEST === '1';
   const API = process.env.RIVHIT_API || `https://${TEST ? 'testicredit' : 'icredit'}.rivhit.co.il/API/PaymentPageRequest.svc`;   // RIVHIT_API: only for local checks
@@ -42,9 +43,10 @@ module.exports = function payments(app, { store, adminOnly, baseOf, secret, getB
   }
 
   // ---------- create a payment record (used by the admin, and later by the website) ----------
-  async function createPayment({ orderKey, amount, desc, name, email, phone, source }) {
+  async function createPayment({ orderKey, amount, desc, name, email, phone, source, order, returnUrl }) {
     const p = { id: 'pay-' + crypto.randomBytes(6).toString('hex'), kind: 'payment', orderKey: clip(orderKey, 80), source: source || 'manual',
       amount, cur: 'USD', desc: clip(desc, 60) || 'Tricky Trivia', name: clip(name, 60), email: clip(email, 50), phone: clip(phone, 15),
+      order: order || undefined, returnUrl: returnUrl || undefined,
       status: 'open', createdAt: Date.now(), updatedAt: Date.now() };
     await store.set(p.id, p);
     return p;
@@ -64,6 +66,53 @@ module.exports = function payments(app, { store, adminOnly, baseOf, secret, getB
     res.json({ ok: true, link: `${base(req)}/pay/${p.id}`, amount });
   });
 
+  // ---------- an order from the Chanukah website ----------
+  // The site sends the order here instead of to the sheet. It goes to the sheet only after the payment succeeds.
+  // The price is worked out here again, the same way the sheet script does, so a changed page can't lower it.
+  const PKG_NAMES = { trivia: 'Tricky Trivia', family: 'Family Pack', party: 'The Big Party' };
+  function priceOf(o) {
+    if (o.pkgKey === 'trivia') return Math.min(o.players, 50) * 5 + Math.max(0, o.players - 50) * 3;
+    if (o.pkgKey === 'family') return 219;
+    return 380 + 190 * (o.packs - 2);
+  }
+  const siteOk = u => {   // where the customer may be sent back after paying
+    try {
+      const x = new URL(u), allowed = String(process.env.SITE_ORIGINS || '').split(/[\s,]+/).filter(Boolean);
+      return x.protocol === 'https:' && (x.hostname.endsWith('.netlify.app') || allowed.includes(x.origin));
+    } catch { return false; }
+  };
+  const webHits = new Map();
+  app.options('/api/pay/order', (req, res) => res.set({ 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST' }).sendStatus(204));
+  app.post('/api/pay/order', require('express').text({ type: () => true, limit: '20kb' }), async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    if (!TOKEN) return res.status(503).json({ error: 'Card payment is not available right now.' });
+    const ip = String(req.headers['x-forwarded-for'] || req.ip).split(',')[0], now = Date.now();
+    const recent = (webHits.get(ip) || []).filter(x => now - x < 3600000);
+    if (recent.length >= 15) return res.status(429).json({ error: 'Too many tries. Please try again later.' });
+    recent.push(now); webHits.set(ip, recent);
+    let b = req.body; if (typeof b === 'string') { try { b = JSON.parse(b); } catch { b = {}; } }
+    const o = (b && b.order) || {};
+    const order = {
+      orderId: clip(o.orderId, 20).toUpperCase(), pkgKey: clip(o.pkgKey, 10), name: clip(o.name, 80), phone: clip(o.phone, 30), whatsapp: clip(o.whatsapp, 30),
+      email: clip(o.email, 50), linkVia: o.linkVia === 'WhatsApp' ? 'WhatsApp' : 'Email', notes: clip(o.notes, 500), lang: o.lang === 'he' ? 'he' : 'en',
+      street: clip(o.street, 100), apt: clip(o.apt, 40), city: clip(o.city, 60), state: clip(o.state, 20), zip: clip(o.zip, 12),
+    };
+    if (!/^CP-[A-Z0-9]{3,15}$/.test(order.orderId) || !PKG_NAMES[order.pkgKey] || order.name.length < 2 || order.phone.replace(/\D/g, '').length < 10
+        || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(order.email)) return res.status(400).json({ error: 'Please check your details and try again.' });
+    order.packs = order.pkgKey === 'party' ? Math.min(10, Math.max(2, parseInt(o.packs, 10) || 2)) : 1;
+    order.players = order.pkgKey === 'trivia' ? Math.min(100, Math.max(4, parseInt(o.players, 10) || 4)) : 0;
+    order.boxes = order.pkgKey === 'trivia' ? 0 : order.packs;
+    order.total = priceOf(order);
+    order.pkg = PKG_NAMES[order.pkgKey];
+    const orderKey = 's-' + order.orderId;
+    const same = (await store.byKind('payment')).filter(x => x.orderKey === orderKey);
+    if (same.some(x => x.status === 'paid')) return res.status(409).json({ error: 'This order is already paid.', paid: true });
+    for (const old of same.filter(x => x.status === 'open')) { old.status = 'replaced'; old.updatedAt = Date.now(); await store.set(old.id, old); }
+    const p = await createPayment({ orderKey, amount: order.total, desc: order.pkgKey === 'trivia' ? `Tricky Trivia · ${order.players} players` : order.pkg,
+      name: order.name, email: order.email, phone: order.phone, source: 'web', order, returnUrl: siteOk(b.returnUrl) ? String(b.returnUrl).slice(0, 400) : '' });
+    res.json({ ok: true, link: `${base(req)}/pay/${p.id}`, total: order.total, orderId: order.orderId });
+  });
+
   // ---------- the customer opens the payment link ----------
   app.get('/pay/:id', async (req, res) => {
     const id = String(req.params.id || '');
@@ -80,7 +129,7 @@ module.exports = function payments(app, { store, adminOnly, baseOf, secret, getB
         Currency: 2, DocumentLanguage: 'en', MaxPayments: 1,
         CustomerLastName: clip(parts.length > 1 ? parts.slice(1).join(' ') : p.name, 30) || 'Customer',
         Order: p.id.slice(4, 19), Custom1: p.id,
-        RedirectURL: `${b}/pay/${p.id}/thanks`,
+        RedirectURL: p.returnUrl || `${b}/pay/${p.id}/thanks`,
         IPNURL: `${b}/api/pay/ipn?p=${p.id}&s=${sig(p.id)}`, IPNFailureURL: `${b}/api/pay/ipn?p=${p.id}&s=${sig(p.id)}&f=1`, IPNMethod: 1,
       };
       if (parts.length > 1) body.CustomerFirstName = clip(parts[0], 20);
@@ -133,8 +182,9 @@ module.exports = function payments(app, { store, adminOnly, baseOf, secret, getB
       // the income goes into the money page by itself (one entry per payment, even if iCredit sends the message twice)
       const mid = 'mn-pay-' + p.id.slice(4);
       if (!(await store.get(mid))) await store.set(mid, { id: mid, kind: 'money', type: 'in', date: Date.now(), amount: p.amount, cur: 'USD',
-        cat: 'טריוויה', note: `אשראי · ${p.name || ''}${p.docNum ? ` · קבלה ${p.docNum}` : ''}`.slice(0, 200), createdAt: Date.now(), updatedAt: Date.now(), auto: true });
+        cat: p.order && p.order.pkgKey !== 'trivia' ? 'ערכות' : 'טריוויה', note: `אשראי · ${p.name || ''}${p.docNum ? ` · קבלה ${p.docNum}` : ''}`.slice(0, 200), createdAt: Date.now(), updatedAt: Date.now(), auto: true });
       console.log('PAID', p.id, p.amount);
+      if (onPaid) onPaid(p.id).catch(e => console.log('after payment:', e.message));
     } finally { busy.delete(id); }
   }
 
