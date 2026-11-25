@@ -544,10 +544,15 @@ function renderOrders() {
       <button class="btn sm ghost" data-edit="${esc(o.key)}" ${canEdit ? '' : 'disabled title="המשחק כבר התחיל"'}>✏️ ערוך</button>
       ${o.status !== 'played' ? `<label class="sentbox"><input type="checkbox" data-sent="${esc(o.key)}" ${o.sent ? 'checked' : ''}>נשלח</label>` : ''}
       ${g && g.scoreTable && g.status === 'finished' ? `<button class="btn sm gold" data-score="${esc(g.id)}">📥 הורד ניקוד</button>` : ''}`;
+    if (o.src === 'manual' && !(o.pay && o.pay.status === 'paid')) acts += ` <button class="btn sm soft" data-paylink="${esc(o.key)}">💳 ${o.pay ? 'קישור תשלום חדש' : 'קישור לתשלום'}</button>`;
+    if (o.pay && o.pay.status === 'open') acts += ` <button class="btn sm ghost" data-paycp="${esc(o.key)}">📋 העתק קישור תשלום</button>`;
     if (o.src === 'manual') acts += ` <button class="btn sm ghost" data-morder="${esc(o.key)}" title="עריכת פרטי ההזמנה">⋯</button>`;
+    const payTag = !o.pay ? '' : o.pay.status === 'paid'
+      ? `<span class="src" style="background:#dff5e6;color:#17683b">💳 שולם $${esc(o.pay.amount)}${o.pay.doc ? ` · קבלה ${esc(o.pay.doc)}` : ''}</span>`
+      : `<span class="src" style="background:#fff1dc;color:#8a5200" title="${esc(o.pay.error)}">⏳ ממתין לתשלום $${esc(o.pay.amount)}${o.pay.error ? ' · ניסיון נכשל' : ''}</span>`;
     return `<tr class="st-${o.status}">
       <td><span class="status ${o.status}">${ST[o.status][0]}</span></td>
-      <td class="ord"><b>${o.orderNo ? '#' + esc(o.orderNo) : '—'}</b>${fmtDate(o.date)}<br>${srcTag}${o.pkg ? `<span class="src" style="background:#f3f1fb;color:#555">${esc(o.pkg)}</span>` : ''}</td>
+      <td class="ord"><b>${o.orderNo ? '#' + esc(o.orderNo) : '—'}</b>${fmtDate(o.date)}<br>${srcTag}${payTag}${o.pkg ? `<span class="src" style="background:#f3f1fb;color:#555">${esc(o.pkg)}</span>` : ''}</td>
       <td class="who"><b dir="auto">${esc(o.name)}</b><span>${esc(o.phone)}</span>${o.email ? `<span>${esc(o.email)}</span>` : ''}</td>
       <td class="num">${g ? g.max : o.players}</td>
       <td class="notes" dir="auto">${esc(o.notes)}</td>
@@ -560,6 +565,19 @@ function renderOrders() {
   document.querySelectorAll('[data-sent]').forEach(c => c.onchange = async () => { await post('/api/admin/order/sent', { orderKey: c.dataset.sent, sent: c.checked }); toast(c.checked ? 'סומן כנשלח ✓' : 'הסימון בוטל'); loadOrders(); });
   document.querySelectorAll('[data-score]').forEach(b => b.onclick = () => scoreImage(b.dataset.score));
   document.querySelectorAll('[data-morder]').forEach(b => b.onclick = () => openManual(b.dataset.morder));
+  document.querySelectorAll('[data-paycp]').forEach(b => b.onclick = () => { const o = ORDERS.find(x => x.key === b.dataset.paycp); copyText(o.pay.link, 'קישור התשלום הועתק ✓'); });
+  document.querySelectorAll('[data-paylink]').forEach(b => b.onclick = () => makePayLink(ORDERS.find(x => x.key === b.dataset.paylink)));
+}
+async function makePayLink(o) {
+  const v = prompt(`סכום לתשלום בדולרים עבור ${o.name}:` + (o.pay ? '\n(הקישור הקודם יפסיק לעבוד)' : ''), o.pay ? o.pay.amount : '');
+  if (v == null || !String(v).trim()) return;
+  try {
+    const r = await post('/api/admin/paylink', { orderKey: o.key, amount: v, name: o.name, email: o.email, phone: o.phone, desc: 'Tricky Trivia' });
+    if (r.error) return alert(r.error);
+    try { await navigator.clipboard.writeText(r.link); } catch (e) {}
+    prompt(`הקישור לתשלום של $${r.amount} הועתק. אפשר לשלוח אותו ללקוח:`, r.link);
+    loadOrders();
+  } catch (e) { if (e.message !== 'auth') alert('לא הצלחתי ליצור קישור: ' + e.message); }
 }
 $('refresh').onclick = async () => { await loadOrders(true); toast('עודכן ✓'); };
 
