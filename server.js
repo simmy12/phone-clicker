@@ -1015,7 +1015,7 @@ async function checkNewOrders() {
     state.init = state.init || {};
     const seen = new Set(state.seen);
     // each source starts by quietly remembering the orders it already has; a sheet that can't be read right now is skipped
-    const sources = { sheet: !sheetCache.error, page: true };
+    const sources = { sheet: !sheetCache.error, page: true, web: true };   // web = website orders paid by card (the same order from the sheet is not announced twice)
     let list = [];
     for (const [src, ok] of Object.entries(sources)) {
       if (!ok) continue;
