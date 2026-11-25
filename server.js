@@ -26,7 +26,7 @@ const T = {                       // phase lengths in ms
   demoLimit: 5 * 60 * 1000,       // a demo game ends by itself after 5 minutes
   resumeWindow: 24 * 3600 * 1000, // a started real game can be resumed for 24 hours
 };
-const DEMO_MAX = 8;
+const DEMO_MAX = 8;               // only for old practice links that carry no player count; new ones allow as many players as the order
 const STALE_MS = 30 * 1000;
 
 // ---------------- themes ----------------
@@ -125,7 +125,7 @@ function newGame(info) {
 function baseGame(info) {
   return {
     id: info.id, kind: info.k || 'real', theme: info.th || 'hanukkah', title: info.title || '', lang: info.lg === 'en' ? 'en' : 'he',
-    max: info.k === 'demo' ? Math.min(DEMO_MAX, info.max || DEMO_MAX) : info.max, status: 'setup', phase: null, qIndex: -1,
+    max: info.k === 'demo' ? (info.max || DEMO_MAX) : info.max, status: 'setup', phase: null, qIndex: -1,
     phaseEnd: 0, phaseLen: 0, paused: false, pausedLeft: 0, mode: 'auto', seconds: 20,
     players: [], used: false, startedAt: 0, finishedAt: 0, updatedAt: Date.now(), timer: null, limitTimer: null,
     ...(info.pk ? { pack: info.pk } : {}),
@@ -575,7 +575,7 @@ app.post('/api/admin/create', adminOnly, (req, res) => {
   const base = { title: String(req.body.title || '').slice(0, 60), th: theme, lg: req.body.lang === 'en' ? 'en' : 'he', exp: Date.now() + days * 86400000 };
   const max = Math.min(100, Math.max(1, parseInt(req.body.maxPlayers, 10) || 8));
   const real = makeToken({ ...base, id, k: 'real', max });
-  const demo = makeToken({ ...base, id: id + '-demo', k: 'demo', max: Math.min(DEMO_MAX, max) });
+  const demo = makeToken({ ...base, id: id + '-demo', k: 'demo', max: max });
   const links = { real: `${baseOf(req)}/play.html?t=${real}`, demo: `${baseOf(req)}/play.html?t=${demo}` };
   store.set(id, snapshot(Object.assign(newGame({ id, k: 'real', th: theme, lg: base.lg, title: base.title, max }), { links, createdAt: Date.now(), scoreTable: !!req.body.scoreTable }))).catch(() => {});
   res.json(links);
@@ -591,7 +591,7 @@ app.post('/api/admin/preview', adminOnly, (req, res) => {   // a sample game wit
 // Orders come from three places: the Google Sheet of the Chanukah site (read only, trivia orders only),
 // orders typed in by hand in the admin ("morder"), and the old order page ("order").
 // Everything the admin marks (game created, links, sent, score table) lives here, never in the sheet.
-const TRIVIA_RE = /trivia|טריוויה|family|משפח|party|מסיב/i;
+const TRIVIA_RE = /trivia|טריוויה|טריויה/i;   // only packages that say trivia (kits named family/party are not trivia)
 async function getSettings() { return (await store.get('settings')) || { id: 'settings', kind: 'settings' }; }
 function playersFor(pkg, qty, participants) {
   const n = parseInt(participants, 10);
@@ -656,7 +656,7 @@ function newGameLinks(req, { title, lang, max, days, scoreTable, orderKey, pack 
   if (pack) base.pk = pack;
   max = Math.min(100, Math.max(1, parseInt(max, 10) || 8));
   const real = `${baseOf(req)}/play.html?t=${makeToken({ ...base, id, k: 'real', max })}`;
-  const demo = `${baseOf(req)}/play.html?t=${makeToken({ ...base, id: id + '-demo', k: 'demo', max: Math.min(DEMO_MAX, max) })}`;
+  const demo = `${baseOf(req)}/play.html?t=${makeToken({ ...base, id: id + '-demo', k: 'demo', max: max })}`;
   const g = newGame({ id, k: 'real', th: 'hanukkah', lg: base.lg, title: base.title, max, pk: pack });
   Object.assign(g, { pack: pack || undefined, scoreTable: !!scoreTable, orderKey: orderKey || '', links: { real, demo }, createdAt: Date.now() });
   games.set(id, g);
@@ -698,7 +698,7 @@ app.post('/api/admin/order/edit-game', adminOnly, async (req, res) => {
   Object.assign(g, upd);
   if (games.has(g.id)) save(g); else await store.set(g.id, { ...g, ...upd });
   const demoId = g.id + '-demo', d = await liveOrStored(demoId);   // the practice game follows the same settings
-  const dUpd = { title: upd.title, lang: upd.lang, max: Math.min(DEMO_MAX, max), updatedAt: Date.now() };
+  const dUpd = { title: upd.title, lang: upd.lang, max: max, updatedAt: Date.now() };
   if (d) { Object.assign(d, dUpd); if (games.has(demoId)) save(d); else await store.set(demoId, { ...d, ...dUpd }); }
   else await store.set(demoId, snapshot(newGame({ id: demoId, k: 'demo', th: g.theme, lg: upd.lang, title: upd.title, max: dUpd.max, pk: g.pack })));
   res.json({ ok: true });
@@ -962,5 +962,120 @@ app.post('/bot', twilioOnly, (req, res) => {
   res.type('text/xml').send(r.toString());
 });
 
+
+
+// ================= new-order emails =================
+// Emails go out through a small Google Apps Script in the business Gmail (Render's free plan blocks normal email ports).
+// Every few minutes the server looks for orders it has not announced yet and emails the people on the list.
+// The very first check only remembers the existing orders, so old orders are never announced.
+const DEFAULT_NOTIFY = ['racheli0534124182@gmail.com', 'simi0527@gmail.com', 'lechter68@gmail.com'];
+const NOTIFY_ID = 'notify-state';
+let publicBase = process.env.RENDER_EXTERNAL_URL || '';
+app.use((req, res, next) => { if (!publicBase && req.get('host') && !/localhost|127\.0\.0\.1/.test(req.get('host'))) publicBase = baseOf(req); next(); });
+const notifyTo = st => (Array.isArray(st.notifyTo) && st.notifyTo.length ? st.notifyTo : DEFAULT_NOTIFY);
+
+async function sendMail(st, { to, subject, html }) {
+  if (!st.mailUrl || !st.mailKey) throw new Error('notConnected');
+  const r = await fetch(st.mailUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, redirect: 'follow',
+    body: JSON.stringify({ key: st.mailKey, to, subject, html }) });
+  const txt = await r.text(); let j;
+  try { j = JSON.parse(txt); } catch { throw new Error('התשובה מהסקריפט לא תקינה. בדקי שהפריסה היא Web app עם גישה ל-Anyone'); }
+  if (j.error) throw new Error(j.error === 'bad key' ? 'המפתח לא תואם למפתח שבסקריפט' : j.error);
+  return j;
+}
+const escH = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function orderMail(o) {
+  const rows = [['שם', o.name], ['טלפון', o.phone], ['מייל', o.email], ['חבילה', o.pkg], ['משתתפים', o.players], ['סכום', o.total],
+    ['מספר הזמנה', o.orderNo], ['הערות', o.notes]].filter(r => r[1] !== '' && r[1] != null);
+  const admin = publicBase ? `${publicBase}/admin.html` : '';
+  return {
+    subject: `🎉 הזמנת טריוויה חדשה: ${o.name || 'ללא שם'}${o.players ? ` (${o.players} משתתפים)` : ''}`,
+    html: `<div dir="rtl" style="font-family:Arial,sans-serif;font-size:15px;color:#1d1b3a">
+      <h2 style="margin:0 0 12px">נכנסה הזמנה חדשה של טריוויה</h2>
+      <table style="border-collapse:collapse">${rows.map(([k, v]) => `<tr><td style="padding:5px 12px 5px 0;color:#6b6890">${k}</td><td style="padding:5px 0;font-weight:bold">${escH(v)}</td></tr>`).join('')}</table>
+      ${admin ? `<p style="margin-top:18px"><a href="${admin}" style="background:#5b3fd6;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">פתיחת מערכת הניהול</a></p>` : ''}
+      <p style="color:#8b88a3;font-size:12px;margin-top:20px">נשלח אוטומטית מ-Tricky Trivia</p></div>`,
+  };
+}
+let notifyBusy = false;
+async function checkNewOrders() {
+  if (notifyBusy) return; notifyBusy = true;
+  try {
+    const st = await getSettings();
+    if (!st.mailUrl || !st.mailKey || st.notifyOff) return;
+    const { orders } = await allOrders(true);
+    const state = (await store.get(NOTIFY_ID)) || { id: NOTIFY_ID, kind: 'notify', seen: [], log: [] };
+    state.init = state.init || {};
+    const seen = new Set(state.seen);
+    // each source starts by quietly remembering the orders it already has; a sheet that can't be read right now is skipped
+    const sources = { sheet: !sheetCache.error, page: true };
+    let list = [];
+    for (const [src, ok] of Object.entries(sources)) {
+      if (!ok) continue;
+      const mine = orders.filter(o => o.src === src);
+      if (!state.init[src]) { mine.forEach(o => seen.add(o.key)); state.init[src] = Date.now(); state.started = state.started || Date.now(); }
+      else list = list.concat(mine);
+    }
+    const fresh = list.filter(o => !seen.has(o.key)).slice(0, 10);
+    for (const o of fresh) {
+      try {
+        await sendMail(st, { to: notifyTo(st), ...orderMail(o) });
+        seen.add(o.key); state.log.unshift({ at: Date.now(), key: o.key, name: o.name, ok: true });
+      } catch (e) {
+        const tries = (state.tries = state.tries || {})[o.key] = ((state.tries || {})[o.key] || 0) + 1;
+        state.log.unshift({ at: Date.now(), key: o.key, name: o.name, ok: false, error: String(e.message || e).slice(0, 160) });
+        if (tries >= 5) seen.add(o.key);   // give up after 5 tries so one bad order does not block the rest
+      }
+    }
+    state.seen = [...seen].slice(-3000); state.log = state.log.slice(0, 30); state.updatedAt = Date.now();
+    await store.set(NOTIFY_ID, state);
+  } catch (e) { console.log('order emails:', e.message); }
+  finally { notifyBusy = false; }
+}
+const NOTIFY_EVERY = +process.env.NOTIFY_MS || 3 * 60 * 1000;   // how often to look for new orders
+setInterval(checkNewOrders, NOTIFY_EVERY); setTimeout(checkNewOrders, Math.min(20000, NOTIFY_EVERY));
+
+app.post('/api/admin/mail', adminOnly, async (req, res) => {   // email settings: script link, key, who gets the emails
+  const st = await getSettings();
+  if (req.body.save) {
+    st.mailUrl = String(req.body.mailUrl || '').trim();
+    if (req.body.mailKey) st.mailKey = String(req.body.mailKey).trim();
+    const to = String(req.body.notifyTo || '').split(/[\s,;]+/).map(x => x.trim().toLowerCase()).filter(x => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+    if (to.length) st.notifyTo = [...new Set(to)].slice(0, 10);
+    st.notifyOff = !!req.body.off; st.updatedAt = Date.now(); await store.set('settings', st);
+  }
+  if (req.body.test) {
+    try {
+      await sendMail(st, { to: notifyTo(st), subject: '✓ בדיקה: המיילים של Tricky Trivia עובדים',
+        html: '<div dir="rtl" style="font-family:Arial,sans-serif;font-size:15px">זה מייל בדיקה. מעכשיו, כשתיכנס הזמנה חדשה של טריוויה, יגיע לכאן מייל עם כל הפרטים.</div>' });
+    } catch (e) { return res.json({ ok: false, error: String(e.message || e) === 'notConnected' ? 'קודם צריך להדביק את כתובת הסקריפט ואת המפתח' : String(e.message || e) }); }
+    return res.json({ ok: true, to: notifyTo(st) });
+  }
+  const state = (await store.get(NOTIFY_ID)) || {};
+  res.json({ ok: true, mailUrl: st.mailUrl || '', hasKey: !!st.mailKey, notifyTo: notifyTo(st), off: !!st.notifyOff, log: state.log || [], started: !!state.started });
+});
+
+// ================= money: income and expenses =================
+// Typed in by hand in the admin. Each entry: income or expense, date, amount, currency, category, note.
+app.post('/api/admin/money', adminOnly, async (req, res) => {
+  const b = req.body;
+  if (b.add) {
+    const amount = Math.round(parseFloat(String(b.amount).replace(/[^\d.\-]/g, '')) * 100) / 100;
+    if (!(amount > 0)) return res.status(400).json({ error: 'צריך לכתוב סכום גדול מ-0' });
+    const date = Date.parse(b.date) || Date.now();
+    const e = { id: b.id && String(b.id).startsWith('mn-') ? String(b.id) : 'mn-' + crypto.randomBytes(5).toString('hex'), kind: 'money',
+      type: b.type === 'out' ? 'out' : 'in', date, amount, cur: b.cur === 'ILS' ? 'ILS' : 'USD',
+      cat: String(b.cat || '').trim().slice(0, 40), note: String(b.note || '').trim().slice(0, 200), updatedAt: Date.now() };
+    const old = await store.get(e.id); if (old && old.kind === 'money') e.createdAt = old.createdAt; else e.createdAt = Date.now();
+    await store.set(e.id, e); return res.json({ ok: true, entry: e });
+  }
+  if (b.del) {
+    const e = await store.get(String(b.del));
+    if (!e || e.kind !== 'money') return res.status(404).json({ error: 'לא נמצא' });
+    await store.del(e.id); return res.json({ ok: true });
+  }
+  const list = (await store.byKind('money')).sort((x, y) => y.date - x.date || y.createdAt - x.createdAt);
+  res.json({ ok: true, entries: list });
+});
 
 app.listen(PORT, () => console.log(`Clicker trivia on port ${PORT} (storage: ${store.kind}, language: ${LANG})`));
