@@ -567,7 +567,7 @@ app.get('/api/health', async (req, res) => {
 
 // --- admin ---
 function adminOnly(req, res, next) { if (req.body.key !== ADMIN_KEY) return res.status(401).json({ error: 'סיסמה שגויה' }); next(); }
-const pay = require('./payments')(app, { store, adminOnly, baseOf, secret: SECRET, getBase: () => publicBase });   // card payments (off until RIVHIT_GROUP_TOKEN is set)
+const pay = require('./payments')(app, { store, adminOnly, baseOf, secret: SECRET, getBase: () => publicBase, onPaid: id => fulfill(id) });   // card payments (off until RIVHIT_GROUP_TOKEN is set)
 
 app.post('/api/admin/create', adminOnly, (req, res) => {
   const theme = loadTheme(req.body.theme || 'hanukkah') ? (req.body.theme || 'hanukkah') : 'hanukkah';
@@ -593,6 +593,7 @@ app.post('/api/admin/preview', adminOnly, (req, res) => {   // a sample game wit
 // orders typed in by hand in the admin ("morder"), and the old order page ("order").
 // Everything the admin marks (game created, links, sent, score table) lives here, never in the sheet.
 const TRIVIA_RE = /trivia|טריוויה|טריויה/i;   // only packages that say trivia (kits named family/party are not trivia)
+const TRIVIA_PKG_HE = 'טריוויה (קליקרים)';
 async function getSettings() { return (await store.get('settings')) || { id: 'settings', kind: 'settings' }; }
 function playersFor(pkg, qty, participants) {
   const n = parseInt(participants, 10);
@@ -629,8 +630,12 @@ const metaId = key => 'om-' + key;
 async function allOrders(force) {
   const [sheet, manual, page, metas, pays] = await Promise.all([sheetOrders(force), store.byKind('morder'), store.byKind('order'), store.byKind('ometa'), pay.byOrder()]);
   const meta = Object.fromEntries(metas.map(m => [m.key, m]));
+  const inSheet = new Set(sheet.data.map(o => o.key));
+  const web = Object.values(pays).filter(p => p.source === 'web' && p.status === 'paid' && p.order && p.order.pkgKey === 'trivia' && !inSheet.has(p.orderKey))
+    .map(p => ({ src: 'web', key: p.orderKey, orderNo: p.order.orderId, date: p.paidAt, name: p.order.name, phone: p.order.phone, email: p.order.email,
+                 pkg: TRIVIA_PKG_HE, notes: p.order.notes || '', total: p.amount, players: p.order.players }));
   const list = [
-    ...sheet.data,
+    ...sheet.data, ...web,
     ...manual.map(o => ({ src: 'manual', key: o.id, orderNo: '', date: o.createdAt, name: o.name, phone: o.phone, email: o.email || '', pkg: '', notes: o.notes || '', total: '', players: o.players || 8 })),
     ...page.map(o => ({ src: 'page', key: 'p-' + o.id, orderNo: '', date: o.createdAt, name: o.name, phone: o.phone, email: o.email || '', pkg: o.pkg || '', notes: [o.night, o.city, o.notes].filter(Boolean).join(' · '), total: '', players: 8 })),
   ];
@@ -646,19 +651,19 @@ async function allOrders(force) {
     const status = !m || !m.gameId ? 'new' : played ? 'played' : m.sent ? 'sent' : 'created';
     out.push({ ...o, status, sent: !!(m && m.sent), links: m && m.gameId ? { real: m.realLink, demo: m.demoLink } : null, game,
                draft: m && !m.gameId && m.draftPack ? m.draftPack : null,
-               pay: pays[o.key] ? { status: pays[o.key].status, amount: pays[o.key].amount, link: `${publicBase}/pay/${pays[o.key].id}`, doc: pays[o.key].docNum || '', error: pays[o.key].lastError || '' } : null });
+               pay: pays[o.key] ? { status: pays[o.key].status, amount: pays[o.key].amount, link: `${publicBase}/pay/${pays[o.key].id}`, doc: pays[o.key].docNum || '', error: pays[o.key].fulfillErr || pays[o.key].lastError || '' } : null });
   }
   const rank = { new: 0, created: 1, sent: 2, played: 3 };
   out.sort((a, b) => rank[a.status] - rank[b.status] || (b.date || 0) - (a.date || 0));
   return { orders: out, sheetError: sheet.error, sheetAt: sheet.at };
 }
-function newGameLinks(req, { title, lang, max, days, scoreTable, orderKey, pack }) {
-  const id = crypto.randomBytes(5).toString('hex');
+function newGameLinks(req, { title, lang, max, days, scoreTable, orderKey, pack }) {   // req can also be the site address itself
+  const id = crypto.randomBytes(5).toString('hex'), site = typeof req === 'string' ? req : baseOf(req);
   const base = { title: String(title || '').slice(0, 60), th: 'hanukkah', lg: lang === 'he' ? 'he' : 'en', exp: Date.now() + Math.min(365, Math.max(1, parseInt(days, 10) || 30)) * 86400000 };
   if (pack) base.pk = pack;
   max = Math.min(100, Math.max(1, parseInt(max, 10) || 8));
-  const real = `${baseOf(req)}/play.html?t=${makeToken({ ...base, id, k: 'real', max })}`;
-  const demo = `${baseOf(req)}/play.html?t=${makeToken({ ...base, id: id + '-demo', k: 'demo', max: max })}`;
+  const real = `${site}/play.html?t=${makeToken({ ...base, id, k: 'real', max })}`;
+  const demo = `${site}/play.html?t=${makeToken({ ...base, id: id + '-demo', k: 'demo', max: max })}`;
   const g = newGame({ id, k: 'real', th: 'hanukkah', lg: base.lg, title: base.title, max, pk: pack });
   Object.assign(g, { pack: pack || undefined, scoreTable: !!scoreTable, orderKey: orderKey || '', links: { real, demo }, createdAt: Date.now() });
   games.set(id, g);
@@ -1056,6 +1061,107 @@ app.post('/api/admin/mail', adminOnly, async (req, res) => {   // email settings
   const state = (await store.get(NOTIFY_ID)) || {};
   res.json({ ok: true, mailUrl: st.mailUrl || '', hasKey: !!st.mailKey, notifyTo: notifyTo(st), off: !!st.notifyOff, log: state.log || [], started: !!state.started });
 });
+
+// ================= after a website order is paid =================
+// 1. the order goes into the sheet, with "paid" (and "receipt sent" when iCredit made the receipt)
+// 2. trivia: the game is created   3. the customer gets an English email with both links   4. "links sent" (J) is marked in the sheet
+// A step that fails is tried again every 2 minutes, up to 5 times. Then the order simply stays "not created" / "not sent"
+// in the admin, nothing more is marked in the sheet, and the people on the email list get one warning email.
+const SHEET_WRITE_URL = process.env.SHEET_WRITE_URL || '', SHEET_WRITE_KEY = process.env.SHEET_WRITE_KEY || '';
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'Landsyitzur@gmail.com';
+async function sheetCall(body) {
+  const r = await fetch(SHEET_WRITE_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, redirect: 'follow', body: JSON.stringify({ ...body, key: SHEET_WRITE_KEY }) });
+  const txt = await r.text(); let j;
+  try { j = JSON.parse(txt); } catch { throw new Error('התשובה מהטבלה לא תקינה'); }
+  if (!j.ok) throw new Error(j.error === 'bad key' ? 'המפתח לא תואם למפתח שבסקריפט של הטבלה' : (j.error || 'שגיאה בטבלה'));
+  return j;
+}
+function linksMail(o, m) {
+  const first = escH(String(o.name || '').split(/\s+/)[0] || 'there');
+  const btn = (href, txt, bg) => `<a href="${href}" style="display:inline-block;background:${bg};color:#0b1433;font-weight:bold;padding:12px 22px;border-radius:10px;text-decoration:none">${txt}</a>`;
+  return {
+    subject: `Your Tricky Trivia links 🎉 (order ${o.orderId})`,
+    html: `<div style="font-family:Arial,sans-serif;font-size:16px;line-height:1.55;color:#1d1b3a;max-width:560px">
+      <h2 style="margin:0 0 10px">Hi ${first}, your Tricky Trivia is ready! 🕎</h2>
+      <p>Thank you for your order. Your game is set for up to <b>${o.players} players</b>.</p>
+      <h3 style="margin:22px 0 6px">1. Practice link</h3>
+      <p style="margin:0 0 10px">Try it first, so you know how everything works. You can use it up to 2 times.</p>
+      ${btn(m.demoLink, '🧪 Open the practice game', '#dfe5ff')}
+      <h3 style="margin:22px 0 6px">2. Your game link</h3>
+      <p style="margin:0 0 10px">For the real game. It works <b>one time</b> and is valid for 30 days.</p>
+      ${btn(m.realLink, '🎮 Open your game', '#e9b949')}
+      <h3 style="margin:24px 0 6px">How to play</h3>
+      <ol style="padding-left:20px;margin:0">
+        <li>Open the game link on a computer, ideally connected to a big screen.</li>
+        <li>Type in the players' names and phone numbers.</li>
+        <li>Everyone calls <b>${escH(PHONE_NUMBER)}</b> from their own phone (kosher phones work too).</li>
+        <li>When a question appears, press 1, 2, 3 or 4 on the phone. Right and fast = more points!</li>
+      </ol>
+      <p style="margin-top:22px">Questions? Just email us at <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
+      <p>Happy Chanukah! ✨<br>Tricky Trivia</p></div>`,
+  };
+}
+const fulfilling = new Set();
+async function fulfill(id) {
+  if (fulfilling.has(id)) return; fulfilling.add(id);
+  try {
+    const p = await store.get(id);
+    if (!p || p.status !== 'paid' || p.source !== 'web' || !p.order) return;
+    const o = p.order, steps = p.steps = p.steps || {}, errs = [];
+    const saveP = () => { p.updatedAt = Date.now(); return store.set(p.id, p); };
+    if (!steps.sheet) {
+      if (!SHEET_WRITE_URL) steps.sheet = 'off';
+      else try { await sheetCall({ action: 'paidOrder', order: o, receipt: !!p.docNum }); steps.sheet = true; } catch (e) { errs.push('טבלה: ' + e.message); }
+      await saveP();
+    }
+    if (o.pkgKey === 'trivia') {
+      let m = await store.get(metaId(p.orderKey));
+      if (!m || (!m.gameId && !m.draftPack)) {
+        try {
+          if (!publicBase) throw new Error('חסרה כתובת השרת');
+          const made = newGameLinks(publicBase, { title: `Tricky Trivia · ${o.name}`.slice(0, 60), lang: o.lang, max: o.players, days: 30, orderKey: p.orderKey });
+          m = { id: metaId(p.orderKey), kind: 'ometa', key: p.orderKey, gameId: made.id, realLink: made.real, demoLink: made.demo, sent: false,
+                concept: 'chanukah', auto: true, createdAt: Date.now(), updatedAt: Date.now() };
+          await store.set(m.id, m); steps.game = true; await saveP();
+        } catch (e) { errs.push('יצירת משחק: ' + e.message); }
+      }
+      if (m && m.gameId && m.auto && !steps.game) steps.game = true;
+      if (m && (m.gameId || m.draftPack) && !m.auto) { steps.game = steps.mail = steps.mark = 'manual'; await saveP(); }   // you took it over by hand
+      // the email goes out only for a game made here automatically, never for one you made by hand
+      if (m && m.gameId && m.auto && !steps.mail) {
+        try {
+          await sendMail(await getSettings(), { to: [o.email], ...linksMail(o, m) });
+          steps.mail = Date.now(); await saveP();
+          m.sent = true; m.updatedAt = Date.now(); await store.set(m.id, m);
+        } catch (e) { errs.push('מייל ללקוחה: ' + (e.message === 'notConnected' ? 'המיילים לא מחוברים בהגדרות' : e.message)); }
+      }
+      if (steps.mail && !steps.mark) {
+        if (!SHEET_WRITE_URL) steps.mark = 'off';
+        else if (steps.sheet === true) try { await sheetCall({ action: 'mark', orderId: o.orderId, col: 'link' }); steps.mark = true; } catch (e) { errs.push('סימון J: ' + e.message); }
+        await saveP();
+      }
+    }
+    p.fulfillErr = errs.join(' · ');
+    if (errs.length) p.fulfillTries = (p.fulfillTries || 0) + 1;
+    if (errs.length && p.fulfillTries >= 5 && !p.alerted) {
+      p.alerted = true;
+      const st = await getSettings();
+      sendMail(st, { to: notifyTo(st), subject: `⚠️ הזמנה שולמה אבל לא הושלמה: ${o.name}`,
+        html: `<div dir="rtl" style="font-family:Arial,sans-serif;font-size:15px">הזמנה ${escH(o.orderId)} של ${escH(o.name)} שולמה ($${p.amount}), אבל משהו לא הצליח אחרי התשלום:<br><b>${escH(p.fulfillErr)}</b><br><br>
+          ${publicBase ? `<a href="${publicBase}/admin.html">פתחי את מערכת הניהול</a> ` : ''}והמשיכי משם ידנית, כמו בהזמנה רגילה.</div>` }).catch(() => {});
+    }
+    await saveP();
+  } finally { fulfilling.delete(id); }
+}
+function needsWork(p) {
+  if (p.kind !== 'payment' || p.status !== 'paid' || p.source !== 'web' || !p.order || (p.fulfillTries || 0) >= 5) return false;
+  if (Date.now() - (p.paidAt || 0) > 3 * 86400000) return false;
+  const s = p.steps || {};
+  return !s.sheet || (p.order.pkgKey === 'trivia' && (!s.game || !s.mail || !s.mark));
+}
+setInterval(async () => {
+  try { for (const p of (await store.byKind('payment')).filter(needsWork)) await fulfill(p.id); } catch (e) { console.log('retry:', e.message); }
+}, 2 * 60 * 1000);
 
 // ================= money: income and expenses =================
 // Typed in by hand in the admin. Each entry: income or expense, date, amount, currency, category, note.
