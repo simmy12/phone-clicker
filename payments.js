@@ -12,6 +12,7 @@
 //   RIVHIT_GROUP_TOKEN   the payment page identifier from iCredit (GroupPrivateToken)
 //   RIVHIT_TEST=1        use iCredit's test environment (fake money). Leave out on the live server.
 //   RIVHIT_EXEMPT_VAT=1  documents without VAT (only after the accountant confirms)
+//   RIVHIT_FILL_ID       fills the Israeli ID field for customers abroad, who have none (e.g. 000000000). Empty = the customer types it
 //   SITE_ORIGINS         the website's own address, if it is not on netlify.app (where to send the customer back after paying)
 
 const crypto = require('crypto');
@@ -21,6 +22,7 @@ module.exports = function payments(app, { store, adminOnly, baseOf, secret, getB
   const TEST = process.env.RIVHIT_TEST === '1';
   const API = process.env.RIVHIT_API || `https://${TEST ? 'testicredit' : 'icredit'}.rivhit.co.il/API/PaymentPageRequest.svc`;   // RIVHIT_API: only for local checks
   const EXEMPT_VAT = process.env.RIVHIT_EXEMPT_VAT === '1';
+  const FILL_ID = /^\d{8,9}$/.test(process.env.RIVHIT_FILL_ID || '') ? process.env.RIVHIT_FILL_ID : '';
 
   const sig = id => crypto.createHmac('sha256', secret).update('pay:' + id).digest('base64url').slice(0, 20);
   const clip = (v, n) => String(v ?? '').trim().slice(0, n);
@@ -135,6 +137,7 @@ module.exports = function payments(app, { store, adminOnly, baseOf, secret, getB
       if (parts.length > 1) body.CustomerFirstName = clip(parts[0], 20);
       if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email)) body.EmailAddress = p.email;
       body.SendMail = false;   // the receipt goes out in our own English email (sender, subject and design are ours)
+      if (FILL_ID) { body.IdNumber = FILL_ID; body.FindById = false; }   // no Israeli ID abroad; never look customers up by it
       if (p.phone) body.PhoneNumber = p.phone.replace(/[^\d+]/g, '').slice(0, 15);
       if (EXEMPT_VAT) body.ExemptVAT = true;
       const r = await rivhit('GetUrl', body);
