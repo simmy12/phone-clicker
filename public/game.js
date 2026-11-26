@@ -219,7 +219,7 @@ let decorDone = false;
 function decor() {
   if (decorDone || !S.theme.decor) return; decorDone = true;
   const spots = [[60, 40, 150, -12], [1720, 60, 160, 10], [40, 860, 150, 8], [1740, 880, 130, -8]];
-  $('decor').innerHTML = S.theme.decor.map((f, i) => { let [l, tp, w, r] = spots[i % 4];
+  $('decor').innerHTML = S.theme.decor.map((f, i) => { if (!f) return ''; let [l, tp, w, r] = spots[i % 4];   // an empty corner draws nothing
     if (f.startsWith('/pimg/')) { r = 0; if (i === 0) tp = 120; }   // uploaded logos: upright, and clear of the host toolbar
     return `<img src="${f.includes('/') ? f : `themes/${S.theme.id}/${f}`}" style="left:${l}px;top:${tp}px;width:${w}px;--r:${r}deg;animation-delay:${-i * 1.5}s" alt="">`; }).join('');
 }
