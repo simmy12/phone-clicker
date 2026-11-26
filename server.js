@@ -1091,7 +1091,26 @@ async function sheetCall(body) {
   if (!j.ok) throw new Error(j.error === 'bad key' ? 'המפתח לא תואם למפתח שבסקריפט של הטבלה' : (j.error || 'שגיאה בטבלה'));
   return j;
 }
-function linksMail(o, m) {
+// the receipt by itself: after a payment link you sent by hand, or a kit order
+function receiptMail(p) {
+  const first = escH(String(p.name || '').split(/\s+/)[0] || 'there');
+  return {
+    subject: 'Your Tricky Trivia receipt',
+    html: `<div style="background:#f3f1fb;padding:24px 10px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden">
+  <tr><td style="background:#0b1433;padding:26px 28px;text-align:center">
+    <div style="font:bold 24px Arial,sans-serif;color:#e9b949">Tricky Trivia</div></td></tr>
+  <tr><td style="padding:28px">
+    <div style="font:bold 20px Arial,sans-serif;color:#1d1b3a">Thank you, ${first}!</div>
+    <div style="font:16px/1.55 Arial,sans-serif;color:#6b6890;margin-top:8px">We received your payment of <b style="color:#1d1b3a">$${p.amount}</b>. Your receipt is ready:</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0 4px"><tr><td style="background:#e9b949;border-radius:12px">
+      <a href="${escH(p.docUrl)}" style="display:inline-block;padding:14px 26px;font:bold 16px Arial,sans-serif;color:#0b1433;text-decoration:none">View your receipt</a></td></tr></table>
+    <div style="font:14px/1.5 Arial,sans-serif;color:#6b6890;margin-top:18px">Questions? Write to us at <a href="mailto:${CONTACT_EMAIL}" style="color:#5b3fd6">${CONTACT_EMAIL}</a>.</div></td></tr>
+  <tr><td style="background:#0b1433;padding:16px;text-align:center;font:14px Arial,sans-serif;color:#e9b949">Happy Chanukah! ✨</td></tr>
+</table></div>`,
+  };
+}
+function linksMail(o, m, docUrl) {
   // A table layout with inline styles, so it looks the same in Gmail, Outlook and on phones.
   const first = escH(String(o.name || '').split(/\s+/)[0] || 'there');
   const NAVY = '#0b1433', GOLD = '#e9b949', INK = '#1d1b3a', MUTED = '#6b6890';
@@ -1126,6 +1145,7 @@ function linksMail(o, m) {
     ${step(3, `Everyone calls <b>${escH(PHONE_NUMBER)}</b> from their own phone. Kosher phones work too.`)}
     ${step(4, 'A question appears on the screen. Press 1, 2, 3 or 4 on your phone. Right and fast wins more points!')}
   </table></td></tr>
+  ${docUrl ? `<tr><td style="padding:4px 28px 10px;font:15px/1.5 Arial,sans-serif;color:${INK}">🧾 Your receipt: <a href="${escH(docUrl)}" style="color:#5b3fd6;font-weight:bold">View your receipt</a></td></tr>` : ''}
   <tr><td style="padding:8px 28px 28px"><div style="background:#fbf6ea;border-radius:12px;padding:16px 18px;font:14px/1.5 Arial,sans-serif;color:${INK}">
     Questions? Write to us at <a href="mailto:${CONTACT_EMAIL}" style="color:#5b3fd6">${CONTACT_EMAIL}</a>.</div></td></tr>
   <tr><td style="background:${NAVY};padding:18px;text-align:center;font:14px Arial,sans-serif;color:${GOLD}">Happy Chanukah! ✨</td></tr>
@@ -1137,9 +1157,18 @@ async function fulfill(id) {
   if (fulfilling.has(id)) return; fulfilling.add(id);
   try {
     const p = await store.get(id);
-    if (!p || p.status !== 'paid' || p.source !== 'web' || !p.order) return;
-    const o = p.order, steps = p.steps = p.steps || {}, errs = [];
+    if (!p || p.status !== 'paid') return;
+    const o = p.order || {}, steps = p.steps = p.steps || {}, errs = [];
     const saveP = () => { p.updatedAt = Date.now(); return store.set(p.id, p); };
+    // the receipt by email: a payment link you sent by hand, or a website order with no game (a kit).
+    // A trivia order from the website gets the receipt inside the links email instead.
+    if ((p.source !== 'web' || o.pkgKey !== 'trivia') && !steps.receipt) {
+      if (!p.email || !p.docUrl) steps.receipt = 'none';
+      else try { await sendMail(custMail(await getSettings()), { to: [p.email], ...receiptMail(p) }); steps.receipt = Date.now(); }
+      catch (e) { errs.push('מייל קבלה ללקוח: ' + (e.message === 'notConnected' ? 'המיילים לא מחוברים בהגדרות' : e.message)); }
+      await saveP();
+    }
+    if (p.source !== 'web' || !p.order) return finish();
     if (!steps.sheet) {
       if (!SHEET_WRITE_URL) steps.sheet = 'off';
       else try { await sheetCall({ action: 'paidOrder', order: o, receipt: !!p.docNum }); steps.sheet = true; } catch (e) { errs.push('טבלה: ' + e.message); }
@@ -1161,7 +1190,7 @@ async function fulfill(id) {
       // the email goes out only for a game made here automatically, never for one you made by hand
       if (m && m.gameId && m.auto && !steps.mail) {
         try {
-          await sendMail(custMail(await getSettings()), { to: [o.email], ...linksMail(o, m) });
+          await sendMail(custMail(await getSettings()), { to: [o.email], ...linksMail(o, m, p.docUrl) });
           steps.mail = Date.now(); await saveP();
           m.sent = true; m.updatedAt = Date.now(); await store.set(m.id, m);
         } catch (e) { errs.push('מייל ללקוחה: ' + (e.message === 'notConnected' ? 'המיילים לא מחוברים בהגדרות' : e.message)); }
@@ -1172,23 +1201,29 @@ async function fulfill(id) {
         await saveP();
       }
     }
-    p.fulfillErr = errs.join(' · ');
-    if (errs.length) p.fulfillTries = (p.fulfillTries || 0) + 1;
-    if (errs.length && p.fulfillTries >= 5 && !p.alerted) {
-      p.alerted = true;
-      const st = await getSettings();
-      sendMail(st, { to: notifyTo(st), subject: `⚠️ הזמנה שולמה אבל לא הושלמה: ${o.name}`,
-        html: `<div dir="rtl" style="font-family:Arial,sans-serif;font-size:15px">הזמנה ${escH(o.orderId)} של ${escH(o.name)} שולמה ($${p.amount}), אבל משהו לא הצליח אחרי התשלום:<br><b>${escH(p.fulfillErr)}</b><br><br>
-          ${publicBase ? `<a href="${publicBase}/admin.html">פתחי את מערכת הניהול</a> ` : ''}והמשיכי משם ידנית, כמו בהזמנה רגילה.</div>` }).catch(() => {});
+    return finish();
+    async function finish() {
+      p.fulfillErr = errs.join(' · ');
+      if (errs.length) p.fulfillTries = (p.fulfillTries || 0) + 1;
+      if (errs.length && p.fulfillTries >= 5 && !p.alerted) {
+        p.alerted = true;
+        const st = await getSettings();
+        const who = o.name || p.name || '', ref = o.orderId ? ` ${o.orderId}` : '';
+        sendMail(st, { to: notifyTo(st), subject: `⚠️ הזמנה שולמה אבל לא הושלמה: ${who}`,
+          html: `<div dir="rtl" style="font-family:Arial,sans-serif;font-size:15px">הזמנה${escH(ref)} של ${escH(who)} שולמה ($${p.amount}), אבל משהו לא הצליח אחרי התשלום:<br><b>${escH(p.fulfillErr)}</b><br><br>
+            ${publicBase ? `<a href="${publicBase}/admin.html">פתחי את מערכת הניהול</a> ` : ''}והמשיכי משם ידנית, כמו בהזמנה רגילה.</div>` }).catch(() => {});
+      }
+      await saveP();
     }
-    await saveP();
   } finally { fulfilling.delete(id); }
 }
 function needsWork(p) {
-  if (p.kind !== 'payment' || p.status !== 'paid' || p.source !== 'web' || !p.order || (p.fulfillTries || 0) >= 5) return false;
+  if (p.kind !== 'payment' || p.status !== 'paid' || (p.fulfillTries || 0) >= 5) return false;
   if (Date.now() - (p.paidAt || 0) > 3 * 86400000) return false;
-  const s = p.steps || {};
-  return !s.sheet || (p.order.pkgKey === 'trivia' && (!s.game || !s.mail || !s.mark));
+  const s = p.steps || {}, o = p.order || {};
+  if ((p.source !== 'web' || o.pkgKey !== 'trivia') && !s.receipt) return true;
+  if (p.source !== 'web' || !p.order) return false;
+  return !s.sheet || (o.pkgKey === 'trivia' && (!s.game || !s.mail || !s.mark));
 }
 setInterval(async () => {
   try { for (const p of (await store.byKind('payment')).filter(needsWork)) await fulfill(p.id); } catch (e) { console.log('retry:', e.message); }
