@@ -483,7 +483,7 @@ app.get('/api/game', withGame, (req, res) => {
 
 function themeView(g, th) {
   const L = th.lang[langOf(g)], pk = g.pack && packs.get(g.pack);
-  const decor = th.decor.map((f, i) => (pk && pk.decor && pk.decor[i]) || `themes/${th.id}/${f}`);
+  const decor = th.decor.map((f, i) => { const own = pk && pk.decor && pk.decor[i]; return own === 'none' ? '' : own || `themes/${th.id}/${f}`; });   // '' = no object in that corner
   const plain = pk && pk.bg === 'plain';
   return { id: th.id, title: plain ? (langOf(g) === 'en' ? 'Trivia Game Show' : 'שעשועון טריוויה') : L.title,
            subtitle: L.subtitle, decor, bgDir: plain ? 'themes/base' : `themes/${th.id}`, bonusImage: th.bonusImage };
@@ -567,7 +567,7 @@ app.get('/api/health', async (req, res) => {
 
 // --- admin ---
 function adminOnly(req, res, next) { if (req.body.key !== ADMIN_KEY) return res.status(401).json({ error: 'סיסמה שגויה' }); next(); }
-const pay = require('./payments')(app, { store, adminOnly, baseOf, secret: SECRET, getBase: () => publicBase });   // card payments (off until RIVHIT_GROUP_TOKEN is set)
+const pay = require('./payments')(app, { store, adminOnly, baseOf, secret: SECRET, getBase: () => publicBase, onPaid: id => fulfill(id) });   // card payments (off until RIVHIT_GROUP_TOKEN is set)
 
 app.post('/api/admin/create', adminOnly, (req, res) => {
   const theme = loadTheme(req.body.theme || 'hanukkah') ? (req.body.theme || 'hanukkah') : 'hanukkah';
@@ -593,6 +593,7 @@ app.post('/api/admin/preview', adminOnly, (req, res) => {   // a sample game wit
 // orders typed in by hand in the admin ("morder"), and the old order page ("order").
 // Everything the admin marks (game created, links, sent, score table) lives here, never in the sheet.
 const TRIVIA_RE = /trivia|טריוויה|טריויה/i;   // only packages that say trivia (kits named family/party are not trivia)
+const TRIVIA_PKG_HE = 'טריוויה (קליקרים)';
 async function getSettings() { return (await store.get('settings')) || { id: 'settings', kind: 'settings' }; }
 function playersFor(pkg, qty, participants) {
   const n = parseInt(participants, 10);
@@ -629,8 +630,12 @@ const metaId = key => 'om-' + key;
 async function allOrders(force) {
   const [sheet, manual, page, metas, pays] = await Promise.all([sheetOrders(force), store.byKind('morder'), store.byKind('order'), store.byKind('ometa'), pay.byOrder()]);
   const meta = Object.fromEntries(metas.map(m => [m.key, m]));
+  const inSheet = new Set(sheet.data.map(o => o.key));
+  const web = Object.values(pays).filter(p => p.source === 'web' && p.status === 'paid' && p.order && p.order.pkgKey === 'trivia' && !inSheet.has(p.orderKey))
+    .map(p => ({ src: 'web', key: p.orderKey, orderNo: p.order.orderId, date: p.paidAt, name: p.order.name, phone: p.order.phone, email: p.order.email,
+                 pkg: TRIVIA_PKG_HE, notes: p.order.notes || '', total: p.amount, players: p.order.players }));
   const list = [
-    ...sheet.data,
+    ...sheet.data, ...web,
     ...manual.map(o => ({ src: 'manual', key: o.id, orderNo: '', date: o.createdAt, name: o.name, phone: o.phone, email: o.email || '', pkg: '', notes: o.notes || '', total: '', players: o.players || 8 })),
     ...page.map(o => ({ src: 'page', key: 'p-' + o.id, orderNo: '', date: o.createdAt, name: o.name, phone: o.phone, email: o.email || '', pkg: o.pkg || '', notes: [o.night, o.city, o.notes].filter(Boolean).join(' · '), total: '', players: 8 })),
   ];
@@ -646,19 +651,19 @@ async function allOrders(force) {
     const status = !m || !m.gameId ? 'new' : played ? 'played' : m.sent ? 'sent' : 'created';
     out.push({ ...o, status, sent: !!(m && m.sent), links: m && m.gameId ? { real: m.realLink, demo: m.demoLink } : null, game,
                draft: m && !m.gameId && m.draftPack ? m.draftPack : null,
-               pay: pays[o.key] ? { status: pays[o.key].status, amount: pays[o.key].amount, link: `${publicBase}/pay/${pays[o.key].id}`, doc: pays[o.key].docNum || '', error: pays[o.key].lastError || '' } : null });
+               pay: pays[o.key] ? { status: pays[o.key].status, amount: pays[o.key].amount, link: `${publicBase}/pay/${pays[o.key].id}`, doc: pays[o.key].docNum || '', error: pays[o.key].fulfillErr || pays[o.key].lastError || '' } : null });
   }
   const rank = { new: 0, created: 1, sent: 2, played: 3 };
   out.sort((a, b) => rank[a.status] - rank[b.status] || (b.date || 0) - (a.date || 0));
   return { orders: out, sheetError: sheet.error, sheetAt: sheet.at };
 }
-function newGameLinks(req, { title, lang, max, days, scoreTable, orderKey, pack }) {
-  const id = crypto.randomBytes(5).toString('hex');
+function newGameLinks(req, { title, lang, max, days, scoreTable, orderKey, pack }) {   // req can also be the site address itself
+  const id = crypto.randomBytes(5).toString('hex'), site = typeof req === 'string' ? req : baseOf(req);
   const base = { title: String(title || '').slice(0, 60), th: 'hanukkah', lg: lang === 'he' ? 'he' : 'en', exp: Date.now() + Math.min(365, Math.max(1, parseInt(days, 10) || 30)) * 86400000 };
   if (pack) base.pk = pack;
   max = Math.min(100, Math.max(1, parseInt(max, 10) || 8));
-  const real = `${baseOf(req)}/play.html?t=${makeToken({ ...base, id, k: 'real', max })}`;
-  const demo = `${baseOf(req)}/play.html?t=${makeToken({ ...base, id: id + '-demo', k: 'demo', max: max })}`;
+  const real = `${site}/play.html?t=${makeToken({ ...base, id, k: 'real', max })}`;
+  const demo = `${site}/play.html?t=${makeToken({ ...base, id: id + '-demo', k: 'demo', max: max })}`;
   const g = newGame({ id, k: 'real', th: 'hanukkah', lg: base.lg, title: base.title, max, pk: pack });
   Object.assign(g, { pack: pack || undefined, scoreTable: !!scoreTable, orderKey: orderKey || '', links: { real, demo }, createdAt: Date.now() });
   games.set(id, g);
@@ -737,7 +742,7 @@ function packProblem(p) {
   }
   return '';
 }
-const cleanDecor = d => [0, 1, 2, 3].map(i => { const v = (d || [])[i]; return typeof v === 'string' && /^\/pimg\/[\w-]+$/.test(v) ? v : null; });
+const cleanDecor = d => [0, 1, 2, 3].map(i => { const v = (d || [])[i]; return v === 'none' || (typeof v === 'string' && /^\/pimg\/[\w-]+$/.test(v)) ? v : null; });   // 'none' = this corner stays empty
 const packView = p => ({ id: p.id, name: p.name || '', template: !!p.template, lang: p.lang, bg: p.bg || 'chanukah', decor: cleanDecor(p.decor), questions: p.questions, gameId: p.gameId || null, settings: p.settings || null });
 function cleanSettings(x) {
   if (!x || typeof x !== 'object') return null;
@@ -976,6 +981,7 @@ let publicBase = process.env.RENDER_EXTERNAL_URL || '';
 app.use((req, res, next) => { if (!publicBase && req.get('host') && !/localhost|127\.0\.0\.1/.test(req.get('host'))) publicBase = baseOf(req); next(); });
 const notifyTo = st => (Array.isArray(st.notifyTo) && st.notifyTo.length ? st.notifyTo : DEFAULT_NOTIFY);
 
+const custMail = st => st.custMailUrl && st.custMailKey ? { mailUrl: st.custMailUrl, mailKey: st.custMailKey } : st;   // the customers' email script, or the main one
 async function sendMail(st, { to, subject, html }) {
   if (!st.mailUrl || !st.mailKey) throw new Error('notConnected');
   const r = await fetch(st.mailUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, redirect: 'follow',
@@ -1010,7 +1016,7 @@ async function checkNewOrders() {
     state.init = state.init || {};
     const seen = new Set(state.seen);
     // each source starts by quietly remembering the orders it already has; a sheet that can't be read right now is skipped
-    const sources = { sheet: !sheetCache.error, page: true };
+    const sources = { sheet: !sheetCache.error, page: true, web: true };   // web = website orders paid by card (the same order from the sheet is not announced twice)
     let list = [];
     for (const [src, ok] of Object.entries(sources)) {
       if (!ok) continue;
@@ -1046,6 +1052,19 @@ app.post('/api/admin/mail', adminOnly, async (req, res) => {   // email settings
     if (to.length) st.notifyTo = [...new Set(to)].slice(0, 10);
     st.notifyOff = !!req.body.off; st.updatedAt = Date.now(); await store.set('settings', st);
   }
+  if (req.body.saveCust) {   // a separate email script for customers (the links email). Empty = the same script as above
+    st.custMailUrl = String(req.body.custMailUrl || '').trim();
+    if (req.body.custMailKey) st.custMailKey = String(req.body.custMailKey).trim();
+    if (!st.custMailUrl) st.custMailKey = '';
+    st.updatedAt = Date.now(); await store.set('settings', st);
+  }
+  if (req.body.testCust) {
+    try {
+      await sendMail(custMail(st), { to: notifyTo(st), subject: '✓ בדיקה: המייל ללקוחות של Tricky Trivia',
+        html: '<div dir="rtl" style="font-family:Arial,sans-serif;font-size:15px">זה מייל בדיקה מהסקריפט של המיילים ללקוחות. שימי לב מאיזו כתובת הוא הגיע: מהכתובת הזאת הלקוחות יקבלו את הקישורים.</div>' });
+    } catch (e) { return res.json({ ok: false, error: String(e.message || e) === 'notConnected' ? 'קודם צריך להדביק את כתובת הסקריפט ואת המפתח' : String(e.message || e) }); }
+    return res.json({ ok: true, to: notifyTo(st) });
+  }
   if (req.body.test) {
     try {
       await sendMail(st, { to: notifyTo(st), subject: '✓ בדיקה: המיילים של Tricky Trivia עובדים',
@@ -1054,8 +1073,126 @@ app.post('/api/admin/mail', adminOnly, async (req, res) => {   // email settings
     return res.json({ ok: true, to: notifyTo(st) });
   }
   const state = (await store.get(NOTIFY_ID)) || {};
-  res.json({ ok: true, mailUrl: st.mailUrl || '', hasKey: !!st.mailKey, notifyTo: notifyTo(st), off: !!st.notifyOff, log: state.log || [], started: !!state.started });
+  res.json({ ok: true, mailUrl: st.mailUrl || '', hasKey: !!st.mailKey, notifyTo: notifyTo(st), off: !!st.notifyOff, log: state.log || [], started: !!state.started,
+             custMailUrl: st.custMailUrl || '', hasCustKey: !!st.custMailKey });
 });
+
+// ================= after a website order is paid =================
+// 1. the order goes into the sheet, with "paid" (and "receipt sent" when iCredit made the receipt)
+// 2. trivia: the game is created   3. the customer gets an English email with both links   4. "links sent" (J) is marked in the sheet
+// A step that fails is tried again every 2 minutes, up to 5 times. Then the order simply stays "not created" / "not sent"
+// in the admin, nothing more is marked in the sheet, and the people on the email list get one warning email.
+const SHEET_WRITE_URL = process.env.SHEET_WRITE_URL || '', SHEET_WRITE_KEY = process.env.SHEET_WRITE_KEY || '';
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'Landsyitzur@gmail.com';
+async function sheetCall(body) {
+  const r = await fetch(SHEET_WRITE_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, redirect: 'follow', body: JSON.stringify({ ...body, key: SHEET_WRITE_KEY }) });
+  const txt = await r.text(); let j;
+  try { j = JSON.parse(txt); } catch { throw new Error('התשובה מהטבלה לא תקינה'); }
+  if (!j.ok) throw new Error(j.error === 'bad key' ? 'המפתח לא תואם למפתח שבסקריפט של הטבלה' : (j.error || 'שגיאה בטבלה'));
+  return j;
+}
+function linksMail(o, m) {
+  // A table layout with inline styles, so it looks the same in Gmail, Outlook and on phones.
+  const first = escH(String(o.name || '').split(/\s+/)[0] || 'there');
+  const NAVY = '#0b1433', GOLD = '#e9b949', INK = '#1d1b3a', MUTED = '#6b6890';
+  const button = (href, txt, bg, fg) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:14px 0 0"><tr><td style="background:${bg};border-radius:12px">
+      <a href="${href}" style="display:inline-block;padding:14px 26px;font:bold 16px Arial,sans-serif;color:${fg};text-decoration:none;border-radius:12px">${txt}</a></td></tr></table>`;
+  const card = (badge, title, text, href, txt, bg, fg) => `<tr><td style="padding:0 28px 16px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e6e3f3;border-radius:14px"><tr><td style="padding:20px 22px">
+        <div style="font:bold 12px Arial,sans-serif;letter-spacing:1px;color:${MUTED};text-transform:uppercase">${badge}</div>
+        <div style="font:bold 19px Arial,sans-serif;color:${INK};margin-top:4px">${title}</div>
+        <div style="font:15px/1.5 Arial,sans-serif;color:${MUTED};margin-top:6px">${text}</div>
+        ${button(href, txt, bg, fg)}</td></tr></table></td></tr>`;
+  const step = (n, t) => `<tr><td width="34" valign="top" style="padding:0 0 12px"><div style="width:26px;height:26px;border-radius:13px;background:${GOLD};color:${NAVY};font:bold 14px/26px Arial,sans-serif;text-align:center">${n}</div></td>
+      <td valign="top" style="padding:3px 0 12px;font:15px/1.5 Arial,sans-serif;color:${INK}">${t}</td></tr>`;
+  return {
+    subject: `Your Tricky Trivia game is ready 🎉 (order ${o.orderId})`,
+    html: `<div style="background:#f3f1fb;padding:24px 10px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden">
+  <tr><td style="background:${NAVY};padding:30px 28px;text-align:center">
+    <div style="font-size:34px;line-height:1">🕎</div>
+    <div style="font:bold 26px Arial,sans-serif;color:${GOLD};margin-top:10px">Tricky Trivia</div>
+    <div style="font:15px Arial,sans-serif;color:#dfe5ff;margin-top:6px">The Chanukah phone game show</div></td></tr>
+  <tr><td style="padding:28px 28px 8px">
+    <div style="font:bold 22px Arial,sans-serif;color:${INK}">Hi ${first}, your game is ready!</div>
+    <div style="font:16px/1.55 Arial,sans-serif;color:${MUTED};margin-top:8px">Thank you for your order. Your game is set for up to <b style="color:${INK}">${o.players} players</b>. Here are your two links:</div></td></tr>
+  <tr><td style="height:12px"></td></tr>
+  ${card('Step 1 · Try it out', 'Practice game', 'See how everything works before the big night. You can use this link up to 2 times.', m.demoLink, 'Open the practice game', '#e9e5ff', NAVY)}
+  ${card('Step 2 · The real thing', 'Your game', 'Use this link for the real game. It works <b>one time</b> and is valid for 30 days.', m.realLink, 'Open your game →', GOLD, NAVY)}
+  <tr><td style="padding:10px 28px 4px"><div style="font:bold 18px Arial,sans-serif;color:${INK}">How to play</div></td></tr>
+  <tr><td style="padding:10px 28px 8px"><table role="presentation" cellpadding="0" cellspacing="0">
+    ${step(1, 'Open the game link on a computer, ideally connected to a big screen.')}
+    ${step(2, "Type in the players' names and phone numbers.")}
+    ${step(3, `Everyone calls <b>${escH(PHONE_NUMBER)}</b> from their own phone. Kosher phones work too.`)}
+    ${step(4, 'A question appears on the screen. Press 1, 2, 3 or 4 on your phone. Right and fast wins more points!')}
+  </table></td></tr>
+  <tr><td style="padding:8px 28px 28px"><div style="background:#fbf6ea;border-radius:12px;padding:16px 18px;font:14px/1.5 Arial,sans-serif;color:${INK}">
+    Questions? Write to us at <a href="mailto:${CONTACT_EMAIL}" style="color:#5b3fd6">${CONTACT_EMAIL}</a>.</div></td></tr>
+  <tr><td style="background:${NAVY};padding:18px;text-align:center;font:14px Arial,sans-serif;color:${GOLD}">Happy Chanukah! ✨</td></tr>
+</table></div>`,
+  };
+}
+const fulfilling = new Set();
+async function fulfill(id) {
+  if (fulfilling.has(id)) return; fulfilling.add(id);
+  try {
+    const p = await store.get(id);
+    if (!p || p.status !== 'paid' || p.source !== 'web' || !p.order) return;
+    const o = p.order, steps = p.steps = p.steps || {}, errs = [];
+    const saveP = () => { p.updatedAt = Date.now(); return store.set(p.id, p); };
+    if (!steps.sheet) {
+      if (!SHEET_WRITE_URL) steps.sheet = 'off';
+      else try { await sheetCall({ action: 'paidOrder', order: o, receipt: !!p.docNum }); steps.sheet = true; } catch (e) { errs.push('טבלה: ' + e.message); }
+      await saveP();
+    }
+    if (o.pkgKey === 'trivia') {
+      let m = await store.get(metaId(p.orderKey));
+      if (!m || (!m.gameId && !m.draftPack)) {
+        try {
+          if (!publicBase) throw new Error('חסרה כתובת השרת');
+          const made = newGameLinks(publicBase, { title: `Tricky Trivia · ${o.name}`.slice(0, 60), lang: o.lang, max: o.players, days: 30, orderKey: p.orderKey });
+          m = { id: metaId(p.orderKey), kind: 'ometa', key: p.orderKey, gameId: made.id, realLink: made.real, demoLink: made.demo, sent: false,
+                concept: 'chanukah', auto: true, createdAt: Date.now(), updatedAt: Date.now() };
+          await store.set(m.id, m); steps.game = true; await saveP();
+        } catch (e) { errs.push('יצירת משחק: ' + e.message); }
+      }
+      if (m && m.gameId && m.auto && !steps.game) steps.game = true;
+      if (m && (m.gameId || m.draftPack) && !m.auto) { steps.game = steps.mail = steps.mark = 'manual'; await saveP(); }   // you took it over by hand
+      // the email goes out only for a game made here automatically, never for one you made by hand
+      if (m && m.gameId && m.auto && !steps.mail) {
+        try {
+          await sendMail(custMail(await getSettings()), { to: [o.email], ...linksMail(o, m) });
+          steps.mail = Date.now(); await saveP();
+          m.sent = true; m.updatedAt = Date.now(); await store.set(m.id, m);
+        } catch (e) { errs.push('מייל ללקוחה: ' + (e.message === 'notConnected' ? 'המיילים לא מחוברים בהגדרות' : e.message)); }
+      }
+      if (steps.mail && !steps.mark) {
+        if (!SHEET_WRITE_URL) steps.mark = 'off';
+        else if (steps.sheet === true) try { await sheetCall({ action: 'mark', orderId: o.orderId, col: 'link' }); steps.mark = true; } catch (e) { errs.push('סימון J: ' + e.message); }
+        await saveP();
+      }
+    }
+    p.fulfillErr = errs.join(' · ');
+    if (errs.length) p.fulfillTries = (p.fulfillTries || 0) + 1;
+    if (errs.length && p.fulfillTries >= 5 && !p.alerted) {
+      p.alerted = true;
+      const st = await getSettings();
+      sendMail(st, { to: notifyTo(st), subject: `⚠️ הזמנה שולמה אבל לא הושלמה: ${o.name}`,
+        html: `<div dir="rtl" style="font-family:Arial,sans-serif;font-size:15px">הזמנה ${escH(o.orderId)} של ${escH(o.name)} שולמה ($${p.amount}), אבל משהו לא הצליח אחרי התשלום:<br><b>${escH(p.fulfillErr)}</b><br><br>
+          ${publicBase ? `<a href="${publicBase}/admin.html">פתחי את מערכת הניהול</a> ` : ''}והמשיכי משם ידנית, כמו בהזמנה רגילה.</div>` }).catch(() => {});
+    }
+    await saveP();
+  } finally { fulfilling.delete(id); }
+}
+function needsWork(p) {
+  if (p.kind !== 'payment' || p.status !== 'paid' || p.source !== 'web' || !p.order || (p.fulfillTries || 0) >= 5) return false;
+  if (Date.now() - (p.paidAt || 0) > 3 * 86400000) return false;
+  const s = p.steps || {};
+  return !s.sheet || (p.order.pkgKey === 'trivia' && (!s.game || !s.mail || !s.mark));
+}
+setInterval(async () => {
+  try { for (const p of (await store.byKind('payment')).filter(needsWork)) await fulfill(p.id); } catch (e) { console.log('retry:', e.message); }
+}, 2 * 60 * 1000);
 
 // ================= money: income and expenses =================
 // Typed in by hand in the admin. Each entry: income or expense, date, amount, currency, category, note.
