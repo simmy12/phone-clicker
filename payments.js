@@ -6,7 +6,7 @@
 //   2. The customer opens /pay/<id>. The server asks iCredit for a fresh payment page and sends the customer there.
 //   3. After a successful charge iCredit sends a message (IPN) to /api/pay/ipn. We ask iCredit to confirm it (Verify),
 //      and only then mark the payment as paid and add the income to the money page.
-//   iCredit itself emails the customer the receipt (SendMail).
+//   iCredit makes the receipt; our server emails it to the customer in English (iCredit's own email is off).
 //
 // Server settings (Render → Environment):
 //   RIVHIT_GROUP_TOKEN   the payment page identifier from iCredit (GroupPrivateToken)
@@ -128,12 +128,13 @@ module.exports = function payments(app, { store, adminOnly, baseOf, secret, getB
         Items: [{ Id: 0, CatalogNumber: 'trivia', UnitPrice: p.amount, Quantity: 1, Description: p.desc }],
         Currency: 2, DocumentLanguage: 'en', MaxPayments: 1,
         CustomerLastName: clip(parts.length > 1 ? parts.slice(1).join(' ') : p.name, 30) || 'Customer',
-        Order: p.id.slice(4, 19), Custom1: p.id,
+        Order: (p.order && p.order.orderId) || p.id.slice(4, 19), Custom1: p.id,
         RedirectURL: p.returnUrl || `${b}/pay/${p.id}/thanks`,
         IPNURL: `${b}/api/pay/ipn?p=${p.id}&s=${sig(p.id)}`, IPNFailureURL: `${b}/api/pay/ipn?p=${p.id}&s=${sig(p.id)}&f=1`, IPNMethod: 1,
       };
       if (parts.length > 1) body.CustomerFirstName = clip(parts[0], 20);
-      if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email)) { body.EmailAddress = p.email; body.SendMail = true; }
+      if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email)) body.EmailAddress = p.email;
+      body.SendMail = false;   // the receipt goes out in our own English email (sender, subject and design are ours)
       if (p.phone) body.PhoneNumber = p.phone.replace(/[^\d+]/g, '').slice(0, 15);
       if (EXEMPT_VAT) body.ExemptVAT = true;
       const r = await rivhit('GetUrl', body);
