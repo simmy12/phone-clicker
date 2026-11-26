@@ -315,7 +315,7 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
         </div>
         <div class="card">
           <h2>📧 מייל על כל הזמנה חדשה</h2>
-          <p>כשנכנסת הזמנה של טריוויה, נשלח מייל עם כל הפרטים. המיילים יוצאים מ-landsyitzur@gmail.com.</p>
+          <p>כשנכנסת הזמנה של טריוויה, נשלח מייל עם כל הפרטים לכתובות שכאן. המיילים יוצאים מהחשבון שבו נמצא הסקריפט.</p>
           <label class="f">כתובת הסקריפט של המיילים (מסתיימת ב-exec/)</label>
           <input class="in" id="eUrl" dir="ltr" placeholder="https://script.google.com/macros/s/.../exec">
           <label class="f">מפתח סודי</label>
@@ -326,6 +326,16 @@ input.in, select.in, textarea.in { width:100%; border:1px solid #d9d5ec; border-
           <div class="row" style="margin-top:14px"><button class="btn" id="eSave">שמור</button><button class="btn soft" id="eTest">שלח מייל בדיקה</button></div>
           <div class="note hidden" id="eNote"></div>
           <div class="mlog" id="eLog"></div>
+        </div>
+        <div class="card">
+          <h2>📨 מייל ללקוחות</h2>
+          <p>המייל עם הקישורים, שנשלח ללקוחה אחרי תשלום באתר. הוא יוצא מהחשבון שבו נמצא הסקריפט הזה. אם משאירים ריק, הוא יוצא מהסקריפט של המייל על הזמנה חדשה.</p>
+          <label class="f">כתובת הסקריפט ללקוחות (מסתיימת ב-exec/)</label>
+          <input class="in" id="cmUrl" dir="ltr" placeholder="https://script.google.com/macros/s/.../exec">
+          <label class="f">מפתח סודי</label>
+          <input class="in" id="cmKey" dir="ltr" placeholder="מופיע בראש הסקריפט">
+          <div class="row" style="margin-top:14px"><button class="btn" id="cmSave">שמור</button><button class="btn soft" id="cmTest">שלח מייל בדיקה</button></div>
+          <div class="note hidden" id="cmNote"></div>
         </div>
         <div class="card">
           <h2>💰 יתרה ב-Twilio</h2>
@@ -535,7 +545,7 @@ function renderOrders() {
   if (!list.length) { $('rows').innerHTML = `<tr><td colspan="6"><div class="empty"><b>${ORDERS.length ? 'אין הזמנות בסינון הזה' : 'עוד אין הזמנות'}</b>${ORDERS.length ? '' : 'הזמנות של טריוויה מהאתר יופיעו כאן לבד. אפשר גם להוסיף הזמנה ידנית.'}</div></td></tr>`; return; }
   $('rows').innerHTML = list.map(o => {
     const g = o.game, canEdit = g && !g.used && g.status !== 'finished' && g.status !== 'play';
-    const srcTag = o.src === 'manual' ? '<span class="src">ידנית</span>' : o.src === 'page' ? '<span class="src">דף הזמנה</span>' : '';
+    const srcTag = o.src === 'manual' ? '<span class="src">ידנית</span>' : o.src === 'page' ? '<span class="src">דף הזמנה</span>' : o.src === 'web' ? '<span class="src">אתר · אשראי</span>' : '';
     let acts;
     if (!o.links && o.draft) acts = `<span class="draft">📝 טיוטה · המשחק עוד לא נוצר</span><button class="btn sm" data-draft="${esc(o.key)}">✏️ המשך עריכה</button>`;
     else if (!o.links) acts = `<button class="btn sm" data-create="${esc(o.key)}">✨ צור משחק</button>`;
@@ -544,10 +554,15 @@ function renderOrders() {
       <button class="btn sm ghost" data-edit="${esc(o.key)}" ${canEdit ? '' : 'disabled title="המשחק כבר התחיל"'}>✏️ ערוך</button>
       ${o.status !== 'played' ? `<label class="sentbox"><input type="checkbox" data-sent="${esc(o.key)}" ${o.sent ? 'checked' : ''}>נשלח</label>` : ''}
       ${g && g.scoreTable && g.status === 'finished' ? `<button class="btn sm gold" data-score="${esc(g.id)}">📥 הורד ניקוד</button>` : ''}`;
+    if (o.src === 'manual' && !(o.pay && o.pay.status === 'paid')) acts += ` <button class="btn sm soft" data-paylink="${esc(o.key)}">💳 ${o.pay ? 'קישור תשלום חדש' : 'קישור לתשלום'}</button>`;
+    if (o.pay && o.pay.status === 'open') acts += ` <button class="btn sm ghost" data-paycp="${esc(o.key)}">📋 העתק קישור תשלום</button>`;
     if (o.src === 'manual') acts += ` <button class="btn sm ghost" data-morder="${esc(o.key)}" title="עריכת פרטי ההזמנה">⋯</button>`;
+    const payTag = !o.pay ? '' : o.pay.status === 'paid'
+      ? `<span class="src" style="background:#dff5e6;color:#17683b">💳 שולם $${esc(o.pay.amount)}${o.pay.doc ? ` · קבלה ${esc(o.pay.doc)}` : ''}</span>${o.pay.error ? `<br><span class="src" style="background:#fde8ea;color:#a3202f;white-space:normal">⚠️ ${esc(o.pay.error)}</span>` : ''}`
+      : `<span class="src" style="background:#fff1dc;color:#8a5200" title="${esc(o.pay.error)}">⏳ ממתין לתשלום $${esc(o.pay.amount)}${o.pay.error ? ' · ניסיון נכשל' : ''}</span>`;
     return `<tr class="st-${o.status}">
       <td><span class="status ${o.status}">${ST[o.status][0]}</span></td>
-      <td class="ord"><b>${o.orderNo ? '#' + esc(o.orderNo) : '—'}</b>${fmtDate(o.date)}<br>${srcTag}${o.pkg ? `<span class="src" style="background:#f3f1fb;color:#555">${esc(o.pkg)}</span>` : ''}</td>
+      <td class="ord"><b>${o.orderNo ? '#' + esc(o.orderNo) : '—'}</b>${fmtDate(o.date)}<br>${srcTag}${payTag}${o.pkg ? `<span class="src" style="background:#f3f1fb;color:#555">${esc(o.pkg)}</span>` : ''}</td>
       <td class="who"><b dir="auto">${esc(o.name)}</b><span>${esc(o.phone)}</span>${o.email ? `<span>${esc(o.email)}</span>` : ''}</td>
       <td class="num">${g ? g.max : o.players}</td>
       <td class="notes" dir="auto">${esc(o.notes)}</td>
@@ -560,6 +575,19 @@ function renderOrders() {
   document.querySelectorAll('[data-sent]').forEach(c => c.onchange = async () => { await post('/api/admin/order/sent', { orderKey: c.dataset.sent, sent: c.checked }); toast(c.checked ? 'סומן כנשלח ✓' : 'הסימון בוטל'); loadOrders(); });
   document.querySelectorAll('[data-score]').forEach(b => b.onclick = () => scoreImage(b.dataset.score));
   document.querySelectorAll('[data-morder]').forEach(b => b.onclick = () => openManual(b.dataset.morder));
+  document.querySelectorAll('[data-paycp]').forEach(b => b.onclick = () => { const o = ORDERS.find(x => x.key === b.dataset.paycp); copyText(o.pay.link, 'קישור התשלום הועתק ✓'); });
+  document.querySelectorAll('[data-paylink]').forEach(b => b.onclick = () => makePayLink(ORDERS.find(x => x.key === b.dataset.paylink)));
+}
+async function makePayLink(o) {
+  const v = prompt(`סכום לתשלום בדולרים עבור ${o.name}:` + (o.pay ? '\n(הקישור הקודם יפסיק לעבוד)' : ''), o.pay ? o.pay.amount : '');
+  if (v == null || !String(v).trim()) return;
+  try {
+    const r = await post('/api/admin/paylink', { orderKey: o.key, amount: v, name: o.name, email: o.email, phone: o.phone, desc: 'Tricky Trivia' });
+    if (r.error) return alert(r.error);
+    try { await navigator.clipboard.writeText(r.link); } catch (e) {}
+    prompt(`הקישור לתשלום של $${r.amount} הועתק. אפשר לשלוח אותו ללקוח:`, r.link);
+    loadOrders();
+  } catch (e) { if (e.message !== 'auth') alert('לא הצלחתי ליצור קישור: ' + e.message); }
 }
 $('refresh').onclick = async () => { await loadOrders(true); toast('עודכן ✓'); };
 
@@ -666,9 +694,13 @@ const gameSettings = () => ({ title: $('eTitle').value.trim(), lang: EDL, player
 
 function renderLook() {
   document.querySelectorAll('.bgopt').forEach(b => { b.classList.toggle('on', b.dataset.bg === (ED.pack.bg || 'chanukah')); b.onclick = () => { ED.pack.bg = b.dataset.bg; renderLook(); autosave(); }; });
-  $('objs').innerHTML = SLOTS.map((name, i) => { const cur = ED.pack.decor[i];
-    return `<div class="obj"><div class="th"><img src="${esc(cur || DEF_DECOR[i])}" alt=""></div>${name}
-      <div class="row"><label class="btn sm soft" style="cursor:pointer">החלף<input type="file" accept="image/*" data-obj="${i}" hidden></label>${cur ? `<button class="btn sm ghost" data-objreset="${i}">מקורי</button>` : ''}</div></div>`; }).join('');
+  $('objs').innerHTML = SLOTS.map((name, i) => { const cur = ED.pack.decor[i], none = cur === 'none';
+    return `<div class="obj"><div class="th">${none ? '<span style="font-size:12px;color:#8b88a3">בלי אובייקט</span>' : `<img src="${esc(cur || DEF_DECOR[i])}" alt="">`}</div>${name}
+      <div class="row" style="flex-wrap:wrap"><label class="btn sm soft" style="cursor:pointer">${none || !cur ? 'תמונה משלי' : 'החלף'}<input type="file" accept="image/*" data-obj="${i}" hidden></label>${cur ? `<button class="btn sm ghost" data-objreset="${i}">רגיל</button>` : ''}${none ? '' : `<button class="btn sm ghost" data-objnone="${i}">בלי</button>`}</div></div>`; }).join('')
+    + `<div style="grid-column:1/-1;display:flex;gap:8px;justify-content:center;direction:rtl"><button class="btn sm ghost" id="objAllNone">🚫 בלי אובייקטים בכלל</button><button class="btn sm ghost" id="objAllDef">↺ כל האובייקטים הרגילים</button></div>`;
+  document.querySelectorAll('[data-objnone]').forEach(b => b.onclick = () => { ED.pack.decor[+b.dataset.objnone] = 'none'; renderLook(); autosave(); });
+  $('objAllNone').onclick = () => { ED.pack.decor = [0, 1, 2, 3].map(() => 'none'); renderLook(); autosave(); };
+  $('objAllDef').onclick = () => { ED.pack.decor = [null, null, null, null]; renderLook(); autosave(); };
   document.querySelectorAll('[data-obj]').forEach(inp => inp.onchange = async () => {
     const url = await uploadImg(inp.files[0], 500, true); if (!url) return;
     ED.pack.decor[+inp.dataset.obj] = url; renderLook(); autosave();
@@ -854,11 +886,20 @@ async function loadMail() {
   const r = await post('/api/admin/mail');
   $('eUrl').value = r.mailUrl || ''; $('eTo').value = (r.notifyTo || []).join('\n'); $('eOff').checked = !!r.off;
   $('eKey').value = ''; $('eKey').placeholder = r.hasKey ? '•••••• (שמור. השאירי ריק כדי לא לשנות)' : 'מופיע בראש הסקריפט';
+  $('cmUrl').value = r.custMailUrl || ''; $('cmKey').value = ''; $('cmKey').placeholder = r.hasCustKey ? '•••••• (שמור. השאירי ריק כדי לא לשנות)' : 'מופיע בראש הסקריפט';
   const log = r.log || [];
   $('eLog').innerHTML = !r.mailUrl ? '' : !r.started ? 'המערכת תתחיל לבדוק הזמנות חדשות בעוד כמה דקות.' :
     log.length ? '<b>מיילים אחרונים:</b><br>' + log.slice(0, 6).map(l => `${l.ok ? '✓' : '⚠️'} ${fmtDate(l.at)} · ${esc(l.name || '')}${l.ok ? '' : ' · לא נשלח: ' + esc(l.error)}`).join('<br>') :
     '✓ פעיל. עוד לא נכנסו הזמנות חדשות מאז החיבור.';
 }
+function custNote(ok, text) { $('cmNote').className = 'note ' + (ok ? 'ok' : 'bad'); $('cmNote').textContent = text; }
+const saveCust = () => post('/api/admin/mail', { saveCust: true, custMailUrl: $('cmUrl').value, custMailKey: $('cmKey').value });
+$('cmSave').onclick = async () => { $('cmSave').disabled = true; await saveCust().finally(() => { $('cmSave').disabled = false; }); custNote(true, '✓ נשמר'); loadMail(); };
+$('cmTest').onclick = async () => {
+  $('cmTest').disabled = true; await saveCust();
+  const r = await post('/api/admin/mail', { testCust: true }).finally(() => { $('cmTest').disabled = false; });
+  custNote(r.ok, r.ok ? `✓ נשלח מייל בדיקה אל: ${r.to.join(', ')}. בדקי מאיזו כתובת הוא הגיע.` : `המייל לא נשלח: ${r.error}`);
+};
 function mailNote(ok, text) { $('eNote').className = 'note ' + (ok ? 'ok' : 'bad'); $('eNote').textContent = text; }
 async function saveMail() {
   return post('/api/admin/mail', { save: true, mailUrl: $('eUrl').value, mailKey: $('eKey').value, notifyTo: $('eTo').value, off: $('eOff').checked });
